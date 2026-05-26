@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Participaciones — Compañía de Danza</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="container" id="main" style="display: none;">
+    <div class="page-header">
+      <h1>Participaciones</h1>
+      <button id="new-btn">+ Nueva participación</button>
+    </div>
+    <div id="alert-container"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Integrante</th><th>Baile</th><th>Rol</th><th>Inicio</th><th>Fin</th><th></th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <h2 id="modal-title">Nueva participación</h2>
+      <form id="form">
+        <input type="hidden" id="f-orig-integrante" />
+        <input type="hidden" id="f-orig-baile" />
+        <div class="form-group"><label for="f-integrante">Integrante</label>
+          <select id="f-integrante" required></select></div>
+        <div class="form-group"><label for="f-baile">Baile</label>
+          <select id="f-baile" required></select></div>
+        <div class="form-group"><label for="f-rol">Rol</label>
+          <input type="text" id="f-rol" placeholder="Ej: Dama principal, Caballero, Solista" maxlength="100" /></div>
+        <div class="form-group"><label for="f-inicio">Fecha de inicio</label>
+          <input type="date" id="f-inicio" /></div>
+        <div class="form-group"><label for="f-fin">Fecha de fin (opcional)</label>
+          <input type="date" id="f-fin" /></div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-btn">Cancelar</button>
+          <button type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script type="module">
+    import { requireAuth, logAudit, getSession } from '/js/auth.js';
+    import { execSQL } from '/js/config.js';
+    import { renderNavbar, formatDate, showAlert, openModal, closeModal } from '/js/ui.js';
+    import { loadRows, deleteCompositeRow, esc } from '/js/crud.js';
+
+    if (!requireAuth()) throw new Error('redirect');
+    renderNavbar('participaciones');
+    document.getElementById('main').style.display = 'block';
+
+    const tbody = document.getElementById('tbody');
+    const alertC = document.getElementById('alert-container');
+
+    async function loadDropdowns() {
+      const { data: ints }   = await execSQL('SELECT id, nombre FROM integrante ORDER BY nombre');
+      const { data: bailes } = await execSQL('SELECT id, nombre FROM baile ORDER BY nombre');
+
+      const si = document.getElementById('f-integrante');
+      si.innerHTML = '<option value="">— Elige integrante —</option>';
+      (ints || []).forEach(i => si.insertAdjacentHTML('beforeend',
+        `<option value="${i.id}">${i.nombre}</option>`));
+
+      const sb = document.getElementById('f-baile');
+      sb.innerHTML = '<option value="">— Elige baile —</option>';
+      (bailes || []).forEach(b => sb.insertAdjacentHTML('beforeend',
+        `<option value="${b.id}">${b.nombre}</option>`));
+    }
+
+    async function reload() {
+      const rows = await loadRows(`
+        SELECT pe.*, i.nombre AS integrante_nombre, b.nombre AS baile_nombre
+          FROM participa_en pe
+          JOIN integrante i ON i.id = pe.id_integrante
+          JOIN baile b      ON b.id = pe.id_baile
+         ORDER BY i.nombre, b.nombre
+      `, tbody, r => `
+        <tr data-int="${r.id_integrante}" data-bai="${r.id_baile}">
+          <td>${r.integrante_nombre}</td>
+          <td>${r.baile_nombre}</td>
+          <td>${r.rol || '—'}</td>
+          <td>${formatDate(r.fecha_inicio)}</td>
+          <td>${formatDate(r.fecha_fin)}</td>
+          <td><div class="actions">
+            <button class="btn-secondary btn-sm" data-edit="1">Editar</button>
+            <button class="btn-danger btn-sm" data-del="1">Borrar</button>
+          </div></td>
+        </tr>
+      `);
+      window._rows = rows;
+    }
+
+    document.getElementById('new-btn').addEventListener('click', () => {
+      document.getElementById('modal-title').textContent = 'Nueva participación';
+      document.getElementById('form').reset();
+      document.getElementById('f-orig-integrante').value = '';
+      document.getElementById('f-orig-baile').value = '';
+      document.getElementById('f-integrante').disabled = false;
+      document.getElementById('f-baile').disabled = false;
+      openModal('modal');
+    });
+    document.getElementById('cancel-btn').addEventListener('click', () => closeModal('modal'));
+
+    tbody.addEventListener('click', async (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      const idInt = tr.dataset.int;
+      const idBai = tr.dataset.bai;
+
+      if (e.target.dataset.edit) {
+        const r = window._rows.find(x => x.id_integrante == idInt && x.id_baile == idBai);
+        document.getElementById('modal-title').textContent = 'Editar participación';
+        document.getElementById('f-orig-integrante').value = r.id_integrante;
+        document.getElementById('f-orig-baile').value = r.id_baile;
+        document.getElementById('f-integrante').value = r.id_integrante;
+        document.getElementById('f-baile').value = r.id_baile;
+        document.getElementById('f-integrante').disabled = true;
+        document.getElementById('f-baile').disabled = true;
+        document.getElementById('f-rol').value = r.rol || '';
+        document.getElementById('f-inicio').value = r.fecha_inicio || '';
+        document.getElementById('f-fin').value = r.fecha_fin || '';
+        openModal('modal');
+      }
+
+      if (e.target.dataset.del) {
+        await deleteCompositeRow('participa_en',
+          `id_integrante=${esc(idInt)} AND id_baile=${esc(idBai)}`, reload, alertC);
+      }
+    });
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const origInt = document.getElementById('f-orig-integrante').value;
+      const origBai = document.getElementById('f-orig-baile').value;
+      const integrante = document.getElementById('f-integrante').value;
+      const baile      = document.getElementById('f-baile').value;
+      const rol        = document.getElementById('f-rol').value.trim() || null;
+      const inicio     = document.getElementById('f-inicio').value || null;
+      const fin        = document.getElementById('f-fin').value || null;
+
+      const sql = (origInt && origBai)
+        ? `UPDATE participa_en SET rol=${esc(rol)}, fecha_inicio=${esc(inicio)}, fecha_fin=${esc(fin)}
+            WHERE id_integrante=${esc(origInt)} AND id_baile=${esc(origBai)} RETURNING *`
+        : `INSERT INTO participa_en (id_integrante, id_baile, rol, fecha_inicio, fecha_fin)
+            VALUES (${esc(integrante)}, ${esc(baile)}, ${esc(rol)}, ${esc(inicio)}, ${esc(fin)})
+            RETURNING *`;
+
+      const { error } = await execSQL(sql);
+      if (error) { showAlert(alertC, 'error', error); return; }
+      const s = getSession();
+      await logAudit(s.user.id, origInt ? 'UPDATE' : 'INSERT',
+        { id_integrante: integrante, id_baile: baile, rol }, 'participa_en', null);
+      showAlert(alertC, 'success', origInt ? 'Participación actualizada' : 'Participación creada');
+      closeModal('modal');
+      await reload();
+    });
+
+    await loadDropdowns();
+    await reload();
+  </script>
+</body>
+</html>

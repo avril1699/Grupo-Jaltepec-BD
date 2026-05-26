@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inicio — Compañía de Danza</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="container" id="main" style="display: none;">
+    <div class="page-header"><h1>Resumen general</h1></div>
+    <div class="dashboard-grid" id="stats"></div>
+    <div class="card">
+      <h2>Próximas presentaciones</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Lugar</th><th>Cuadros</th></tr></thead>
+          <tbody id="proximas-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Última actividad</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cuándo</th><th>Usuario</th><th>Acción</th><th>Tabla</th></tr></thead>
+          <tbody id="audit-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { requireAuth } from '/js/auth.js';
+    import { execSQL } from '/js/config.js';
+    import { renderNavbar, formatDateTime } from '/js/ui.js';
+
+    if (!requireAuth()) throw new Error('redirect');
+    renderNavbar('dashboard');
+    document.getElementById('main').style.display = 'block';
+
+    const stats = document.getElementById('stats');
+    const queries = [
+      { label: 'Integrantes',      sql: 'SELECT COUNT(*) AS n FROM integrante' },
+      { label: 'Bailes',           sql: 'SELECT COUNT(*) AS n FROM baile' },
+      { label: 'Presentaciones',   sql: 'SELECT COUNT(*) AS n FROM presentacion' },
+      { label: 'Cuadros',          sql: 'SELECT COUNT(*) AS n FROM cuadro' },
+      { label: 'Ítems inventario', sql: 'SELECT COUNT(*) AS n FROM inventario' },
+      { label: 'Observaciones',    sql: 'SELECT COUNT(*) AS n FROM observacion' }
+    ];
+    for (const q of queries) {
+      const { data } = await execSQL(q.sql);
+      const value = data && data[0] ? data[0].n : '?';
+      stats.insertAdjacentHTML('beforeend', `
+        <div class="stat-card">
+          <div class="label">${q.label}</div>
+          <div class="value">${value}</div>
+        </div>
+      `);
+    }
+
+    const proximas = await execSQL(`
+      SELECT p.id, p.fecha, p.lugar, COUNT(c.id) AS num_cuadros
+        FROM presentacion p
+        LEFT JOIN cuadro c ON c.id_presentation = p.id
+       WHERE p.fecha >= NOW()
+       GROUP BY p.id
+       ORDER BY p.fecha ASC
+       LIMIT 5
+    `);
+    const proxTbody = document.getElementById('proximas-tbody');
+    if (proximas.data && proximas.data.length > 0) {
+      proximas.data.forEach(p => proxTbody.insertAdjacentHTML('beforeend', `
+        <tr><td>${formatDateTime(p.fecha)}</td><td>${p.lugar}</td><td>${p.num_cuadros}</td></tr>
+      `));
+    } else {
+      proxTbody.innerHTML = '<tr><td colspan="3" class="empty">No hay presentaciones futuras</td></tr>';
+    }
+
+    const audit = await execSQL(`
+      SELECT a.created_at, a.accion, a.tabla_afectada, u.email
+        FROM audit_log a
+        LEFT JOIN usuario u ON u.id = a.id_usuario
+       ORDER BY a.created_at DESC
+       LIMIT 10
+    `);
+    const auditTbody = document.getElementById('audit-tbody');
+    if (audit.data && audit.data.length > 0) {
+      audit.data.forEach(a => auditTbody.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td>${formatDateTime(a.created_at)}</td>
+          <td>${a.email || '—'}</td>
+          <td>${a.accion}</td>
+          <td>${a.tabla_afectada || '—'}</td>
+        </tr>
+      `));
+    } else {
+      auditTbody.innerHTML = '<tr><td colspan="4" class="empty">Sin actividad reciente</td></tr>';
+    }
+  </script>
+</body>
+</html>

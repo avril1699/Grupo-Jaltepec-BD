@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Observaciones — Compañía de Danza</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="container" id="main" style="display: none;">
+    <div class="page-header">
+      <h1>Observaciones</h1>
+      <button id="new-btn">+ Nueva observación</button>
+    </div>
+    <div id="alert-container"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Integrante</th><th>Presentación</th><th>Ensayo</th><th>Notas</th><th></th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <h2 id="modal-title">Nueva observación</h2>
+      <form id="form">
+        <input type="hidden" id="f-id" />
+        <div class="form-group"><label for="f-integrante">Integrante</label>
+          <select id="f-integrante" required></select></div>
+        <div class="form-group"><label for="f-presentacion">Presentación (texto libre)</label>
+          <input type="text" id="f-presentacion" maxlength="250" /></div>
+        <div class="form-group"><label for="f-ensayo">Ensayo (texto libre)</label>
+          <input type="text" id="f-ensayo" maxlength="250" /></div>
+        <div class="form-group"><label for="f-notas">Notas</label>
+          <textarea id="f-notas" rows="4"></textarea></div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-btn">Cancelar</button>
+          <button type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script type="module">
+    import { requireAuth, logAudit, getSession } from '/js/auth.js';
+    import { execSQL } from '/js/config.js';
+    import { renderNavbar, showAlert, openModal, closeModal } from '/js/ui.js';
+    import { loadRows, deleteRow, esc } from '/js/crud.js';
+
+    if (!requireAuth()) throw new Error('redirect');
+    renderNavbar('observaciones');
+    document.getElementById('main').style.display = 'block';
+
+    const tbody = document.getElementById('tbody');
+    const alertC = document.getElementById('alert-container');
+
+    async function loadDropdowns() {
+      const { data: ints } = await execSQL('SELECT id, nombre FROM integrante ORDER BY nombre');
+      const si = document.getElementById('f-integrante');
+      si.innerHTML = '<option value="">— Elige integrante —</option>';
+      (ints || []).forEach(i => si.insertAdjacentHTML('beforeend',
+        `<option value="${i.id}">${i.nombre}</option>`));
+    }
+
+    async function reload() {
+      const rows = await loadRows(`
+        SELECT o.*, i.nombre AS integrante_nombre
+          FROM observacion o
+          JOIN integrante i ON i.id = o.id_integrante
+         ORDER BY o.id DESC
+      `, tbody, r => `
+        <tr>
+          <td>${r.id}</td>
+          <td>${r.integrante_nombre}</td>
+          <td>${r.presentacion || '—'}</td>
+          <td>${r.ensayo || '—'}</td>
+          <td>${r.notas ? r.notas.slice(0, 60) + (r.notas.length > 60 ? '…' : '') : '—'}</td>
+          <td><div class="actions">
+            <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
+            <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
+          </div></td>
+        </tr>
+      `);
+      window._rows = rows;
+    }
+
+    document.getElementById('new-btn').addEventListener('click', () => {
+      document.getElementById('modal-title').textContent = 'Nueva observación';
+      document.getElementById('form').reset();
+      document.getElementById('f-id').value = '';
+      openModal('modal');
+    });
+    document.getElementById('cancel-btn').addEventListener('click', () => closeModal('modal'));
+
+    tbody.addEventListener('click', async (e) => {
+      const editId = e.target.dataset.edit;
+      const delId  = e.target.dataset.del;
+      if (editId) {
+        const r = window._rows.find(x => x.id == editId);
+        document.getElementById('modal-title').textContent = 'Editar observación';
+        document.getElementById('f-id').value = r.id;
+        document.getElementById('f-integrante').value = r.id_integrante || '';
+        document.getElementById('f-presentacion').value = r.presentacion || '';
+        document.getElementById('f-ensayo').value = r.ensayo || '';
+        document.getElementById('f-notas').value = r.notas || '';
+        openModal('modal');
+      }
+      if (delId) await deleteRow('observacion', delId, reload, alertC);
+    });
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id    = document.getElementById('f-id').value;
+      const intId = document.getElementById('f-integrante').value;
+      const pres  = document.getElementById('f-presentacion').value.trim() || null;
+      const ens   = document.getElementById('f-ensayo').value.trim() || null;
+      const notas = document.getElementById('f-notas').value.trim() || null;
+
+      const sql = id
+        ? `UPDATE observacion SET id_integrante=${esc(intId)}, presentacion=${esc(pres)},
+                  ensayo=${esc(ens)}, notas=${esc(notas)}
+            WHERE id=${esc(id)} RETURNING *`
+        : `INSERT INTO observacion (id_integrante, presentacion, ensayo, notas)
+            VALUES (${esc(intId)}, ${esc(pres)}, ${esc(ens)}, ${esc(notas)}) RETURNING *`;
+
+      const { data, error } = await execSQL(sql);
+      if (error) { showAlert(alertC, 'error', error); return; }
+      const s = getSession();
+      await logAudit(s.user.id, id ? 'UPDATE' : 'INSERT',
+        { id_integrante: intId, presentacion: pres, ensayo: ens },
+        'observacion', data && data[0] ? data[0].id : null);
+      showAlert(alertC, 'success', id ? 'Observación actualizada' : 'Observación creada');
+      closeModal('modal');
+      await reload();
+    });
+
+    await loadDropdowns();
+    await reload();
+  </script>
+</body>
+</html>

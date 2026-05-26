@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventario — Compañía de Danza</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="container" id="main" style="display: none;">
+    <div class="page-header">
+      <h1>Inventario</h1>
+      <div class="actions">
+        <button id="new-btn">+ Nuevo ítem</button>
+        <button id="assign-btn" class="btn-secondary">+ Asignar a presentación</button>
+      </div>
+    </div>
+    <div id="alert-container"></div>
+    <div class="card">
+      <h2>Ítems del inventario</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Cantidad</th><th>Color</th><th></th></tr></thead>
+          <tbody id="tbody-items"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Asignaciones por presentación</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Ítem</th><th>Presentación</th><th>Cantidad llevada</th><th>Observaciones</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-asig"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="modal-item">
+    <div class="modal">
+      <h2 id="m-item-title">Nuevo ítem</h2>
+      <form id="form-item">
+        <input type="hidden" id="fi-id" />
+        <div class="form-group"><label for="fi-nombre">Nombre</label>
+          <input type="text" id="fi-nombre" required maxlength="250" /></div>
+        <div class="form-group"><label for="fi-cantidad">Cantidad total</label>
+          <input type="number" id="fi-cantidad" min="0" value="0" /></div>
+        <div class="form-group"><label for="fi-color">Color</label>
+          <input type="text" id="fi-color" maxlength="50" /></div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-item">Cancelar</button>
+          <button type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="modal-asig">
+    <div class="modal">
+      <h2 id="m-asig-title">Asignar a presentación</h2>
+      <form id="form-asig">
+        <input type="hidden" id="fa-orig-item" />
+        <input type="hidden" id="fa-orig-pres" />
+        <div class="form-group"><label for="fa-item">Ítem</label>
+          <select id="fa-item" required></select></div>
+        <div class="form-group"><label for="fa-pres">Presentación</label>
+          <select id="fa-pres" required></select></div>
+        <div class="form-group"><label for="fa-cantidad">Cantidad llevada</label>
+          <input type="number" id="fa-cantidad" min="0" value="0" /></div>
+        <div class="form-group"><label for="fa-obs">Observaciones</label>
+          <textarea id="fa-obs" rows="2"></textarea></div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-asig">Cancelar</button>
+          <button type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script type="module">
+    import { requireAuth, logAudit, getSession } from '/js/auth.js';
+    import { execSQL } from '/js/config.js';
+    import { renderNavbar, formatDateTime, showAlert, openModal, closeModal } from '/js/ui.js';
+    import { loadRows, deleteRow, deleteCompositeRow, esc } from '/js/crud.js';
+
+    if (!requireAuth()) throw new Error('redirect');
+    renderNavbar('inventario');
+    document.getElementById('main').style.display = 'block';
+
+    const tbItems = document.getElementById('tbody-items');
+    const tbAsig  = document.getElementById('tbody-asig');
+    const alertC  = document.getElementById('alert-container');
+
+    async function loadDropdowns() {
+      const { data: items } = await execSQL('SELECT id, nombre FROM inventario ORDER BY nombre');
+      const { data: pres }  = await execSQL('SELECT id, fecha, lugar FROM presentacion ORDER BY fecha DESC');
+
+      const sa = document.getElementById('fa-item');
+      sa.innerHTML = '<option value="">— Elige ítem —</option>';
+      (items || []).forEach(i => sa.insertAdjacentHTML('beforeend',
+        `<option value="${i.id}">${i.nombre}</option>`));
+
+      const sp = document.getElementById('fa-pres');
+      sp.innerHTML = '<option value="">— Elige presentación —</option>';
+      (pres || []).forEach(p => sp.insertAdjacentHTML('beforeend',
+        `<option value="${p.id}">${new Date(p.fecha).toLocaleDateString('es-PE')} · ${p.lugar}</option>`));
+    }
+
+    async function reloadItems() {
+      const rows = await loadRows('SELECT * FROM inventario ORDER BY id ASC', tbItems,
+        r => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.nombre}</td>
+            <td>${r.cantidad_total}</td>
+            <td>${r.color || '—'}</td>
+            <td><div class="actions">
+              <button class="btn-secondary btn-sm" data-edit-item="${r.id}">Editar</button>
+              <button class="btn-danger btn-sm" data-del-item="${r.id}">Borrar</button>
+            </div></td>
+          </tr>
+        `);
+      window._items = rows;
+    }
+
+    async function reloadAsig() {
+      const rows = await loadRows(`
+        SELECT ip.*, i.nombre AS item_nombre,
+               p.fecha AS pres_fecha, p.lugar AS pres_lugar
+          FROM inventario_presentacion ip
+          JOIN inventario i ON i.id = ip.id_item
+          JOIN presentacion p ON p.id = ip.id_presentation
+         ORDER BY p.fecha DESC, i.nombre
+      `, tbAsig, r => `
+        <tr data-item="${r.id_item}" data-pres="${r.id_presentation}">
+          <td>${r.item_nombre}</td>
+          <td>${formatDateTime(r.pres_fecha)} · ${r.pres_lugar}</td>
+          <td>${r.cantidad_llevada}</td>
+          <td>${r.observaciones || '—'}</td>
+          <td><div class="actions">
+            <button class="btn-secondary btn-sm" data-edit-asig="1">Editar</button>
+            <button class="btn-danger btn-sm" data-del-asig="1">Borrar</button>
+          </div></td>
+        </tr>
+      `);
+      window._asig = rows;
+    }
+
+    document.getElementById('new-btn').addEventListener('click', () => {
+      document.getElementById('m-item-title').textContent = 'Nuevo ítem';
+      document.getElementById('form-item').reset();
+      document.getElementById('fi-id').value = '';
+      openModal('modal-item');
+    });
+    document.getElementById('cancel-item').addEventListener('click', () => closeModal('modal-item'));
+
+    document.getElementById('assign-btn').addEventListener('click', () => {
+      document.getElementById('m-asig-title').textContent = 'Asignar a presentación';
+      document.getElementById('form-asig').reset();
+      document.getElementById('fa-orig-item').value = '';
+      document.getElementById('fa-orig-pres').value = '';
+      document.getElementById('fa-item').disabled = false;
+      document.getElementById('fa-pres').disabled = false;
+      openModal('modal-asig');
+    });
+    document.getElementById('cancel-asig').addEventListener('click', () => closeModal('modal-asig'));
+
+    tbItems.addEventListener('click', async (e) => {
+      const editId = e.target.dataset.editItem;
+      const delId  = e.target.dataset.delItem;
+      if (editId) {
+        const r = window._items.find(x => x.id == editId);
+        document.getElementById('m-item-title').textContent = 'Editar ítem';
+        document.getElementById('fi-id').value = r.id;
+        document.getElementById('fi-nombre').value = r.nombre || '';
+        document.getElementById('fi-cantidad').value = r.cantidad_total || 0;
+        document.getElementById('fi-color').value = r.color || '';
+        openModal('modal-item');
+      }
+      if (delId) await deleteRow('inventario', delId, reloadItems, alertC);
+    });
+
+    tbAsig.addEventListener('click', async (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      const idItem = tr.dataset.item;
+      const idPres = tr.dataset.pres;
+      if (e.target.dataset.editAsig) {
+        const r = window._asig.find(x => x.id_item == idItem && x.id_presentation == idPres);
+        document.getElementById('m-asig-title').textContent = 'Editar asignación';
+        document.getElementById('fa-orig-item').value = r.id_item;
+        document.getElementById('fa-orig-pres').value = r.id_presentation;
+        document.getElementById('fa-item').value = r.id_item;
+        document.getElementById('fa-pres').value = r.id_presentation;
+        document.getElementById('fa-item').disabled = true;
+        document.getElementById('fa-pres').disabled = true;
+        document.getElementById('fa-cantidad').value = r.cantidad_llevada || 0;
+        document.getElementById('fa-obs').value = r.observaciones || '';
+        openModal('modal-asig');
+      }
+      if (e.target.dataset.delAsig) {
+        await deleteCompositeRow('inventario_presentacion',
+          `id_item=${esc(idItem)} AND id_presentation=${esc(idPres)}`, reloadAsig, alertC);
+      }
+    });
+
+    document.getElementById('form-item').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id     = document.getElementById('fi-id').value;
+      const nombre = document.getElementById('fi-nombre').value.trim();
+      const cant   = parseInt(document.getElementById('fi-cantidad').value) || 0;
+      const color  = document.getElementById('fi-color').value.trim() || null;
+
+      const sql = id
+        ? `UPDATE inventario SET nombre=${esc(nombre)}, cantidad_total=${cant}, color=${esc(color)}
+            WHERE id=${esc(id)} RETURNING *`
+        : `INSERT INTO inventario (nombre, cantidad_total, color)
+            VALUES (${esc(nombre)}, ${cant}, ${esc(color)}) RETURNING *`;
+
+      const { data, error } = await execSQL(sql);
+      if (error) { showAlert(alertC, 'error', error); return; }
+      const s = getSession();
+      await logAudit(s.user.id, id ? 'UPDATE' : 'INSERT',
+        { nombre, cantidad_total: cant, color }, 'inventario',
+        data && data[0] ? data[0].id : null);
+      showAlert(alertC, 'success', id ? 'Ítem actualizado' : 'Ítem creado');
+      closeModal('modal-item');
+      await reloadItems();
+      await loadDropdowns();
+    });
+
+    document.getElementById('form-asig').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const origItem = document.getElementById('fa-orig-item').value;
+      const origPres = document.getElementById('fa-orig-pres').value;
+      const item = document.getElementById('fa-item').value;
+      const pres = document.getElementById('fa-pres').value;
+      const cant = parseInt(document.getElementById('fa-cantidad').value) || 0;
+      const obs  = document.getElementById('fa-obs').value.trim() || null;
+
+      const sql = (origItem && origPres)
+        ? `UPDATE inventario_presentacion SET cantidad_llevada=${cant}, observaciones=${esc(obs)}
+            WHERE id_item=${esc(origItem)} AND id_presentation=${esc(origPres)} RETURNING *`
+        : `INSERT INTO inventario_presentacion (id_item, id_presentation, cantidad_llevada, observaciones)
+            VALUES (${esc(item)}, ${esc(pres)}, ${cant}, ${esc(obs)}) RETURNING *`;
+
+      const { error } = await execSQL(sql);
+      if (error) { showAlert(alertC, 'error', error); return; }
+      const s = getSession();
+      await logAudit(s.user.id, origItem ? 'UPDATE' : 'INSERT',
+        { id_item: item, id_presentation: pres, cantidad_llevada: cant },
+        'inventario_presentacion', null);
+      showAlert(alertC, 'success', origItem ? 'Asignación actualizada' : 'Asignación creada');
+      closeModal('modal-asig');
+      await reloadAsig();
+    });
+
+    await loadDropdowns();
+    await reloadItems();
+    await reloadAsig();
+  </script>
+</body>
+</html>

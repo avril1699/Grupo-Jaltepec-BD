@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bailes — Compañía de Danza</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div class="container" id="main" style="display: none;">
+    <div class="page-header">
+      <h1>Bailes</h1>
+      <button id="new-btn">+ Nuevo baile</button>
+    </div>
+    <div id="alert-container"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Nombre</th><th>Duración</th><th>Solistas</th><th>Información</th><th></th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <h2 id="modal-title">Nuevo baile</h2>
+      <form id="form">
+        <input type="hidden" id="f-id" />
+        <div class="form-group"><label for="f-nombre">Nombre del baile</label>
+          <input type="text" id="f-nombre" required maxlength="250" /></div>
+        <div class="form-group"><label for="f-duracion">Duración (HH:MM:SS)</label>
+          <input type="text" id="f-duracion" placeholder="00:05:30" pattern="\d{2}:\d{2}:\d{2}" /></div>
+        <div class="form-group"><label for="f-solistas">Solistas</label>
+          <input type="text" id="f-solistas" placeholder="Nombres separados por coma" /></div>
+        <div class="form-group"><label for="f-info">Información del baile</label>
+          <textarea id="f-info" rows="3"></textarea></div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-btn">Cancelar</button>
+          <button type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script type="module">
+    import { requireAuth, logAudit, getSession } from '/js/auth.js';
+    import { execSQL } from '/js/config.js';
+    import { renderNavbar, showAlert, openModal, closeModal } from '/js/ui.js';
+    import { loadRows, deleteRow, esc } from '/js/crud.js';
+
+    if (!requireAuth()) throw new Error('redirect');
+    renderNavbar('bailes');
+    document.getElementById('main').style.display = 'block';
+
+    const tbody = document.getElementById('tbody');
+    const alertC = document.getElementById('alert-container');
+
+    function fmtInterval(i) {
+      if (!i) return '—';
+      if (typeof i === 'string') return i;
+      const h = String(i.hours || 0).padStart(2, '0');
+      const m = String(i.minutes || 0).padStart(2, '0');
+      const s = String(i.seconds || 0).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
+
+    async function reload() {
+      const rows = await loadRows('SELECT * FROM baile ORDER BY id ASC', tbody,
+        r => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.nombre}</td>
+            <td>${fmtInterval(r.duracion)}</td>
+            <td>${r.solistas || '—'}</td>
+            <td>${r.informacion_baile ? r.informacion_baile.slice(0, 50) + (r.informacion_baile.length > 50 ? '…' : '') : '—'}</td>
+            <td><div class="actions">
+              <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
+              <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
+            </div></td>
+          </tr>
+        `);
+      window._rows = rows;
+    }
+
+    document.getElementById('new-btn').addEventListener('click', () => {
+      document.getElementById('modal-title').textContent = 'Nuevo baile';
+      document.getElementById('form').reset();
+      document.getElementById('f-id').value = '';
+      openModal('modal');
+    });
+    document.getElementById('cancel-btn').addEventListener('click', () => closeModal('modal'));
+
+    tbody.addEventListener('click', async (e) => {
+      const editId = e.target.dataset.edit;
+      const delId  = e.target.dataset.del;
+      if (editId) {
+        const r = window._rows.find(x => x.id == editId);
+        document.getElementById('modal-title').textContent = 'Editar baile';
+        document.getElementById('f-id').value = r.id;
+        document.getElementById('f-nombre').value = r.nombre || '';
+        document.getElementById('f-duracion').value = fmtInterval(r.duracion) === '—' ? '' : fmtInterval(r.duracion);
+        document.getElementById('f-solistas').value = r.solistas || '';
+        document.getElementById('f-info').value = r.informacion_baile || '';
+        openModal('modal');
+      }
+      if (delId) await deleteRow('baile', delId, reload, alertC);
+    });
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id     = document.getElementById('f-id').value;
+      const nombre = document.getElementById('f-nombre').value.trim();
+      const dur    = document.getElementById('f-duracion').value.trim() || null;
+      const sols   = document.getElementById('f-solistas').value.trim() || null;
+      const info   = document.getElementById('f-info').value.trim() || null;
+      const durSql = dur ? `${esc(dur)}::interval` : 'NULL';
+
+      const sql = id
+        ? `UPDATE baile SET nombre=${esc(nombre)}, duracion=${durSql},
+                  solistas=${esc(sols)}, informacion_baile=${esc(info)}
+            WHERE id=${esc(id)} RETURNING *`
+        : `INSERT INTO baile (nombre, duracion, solistas, informacion_baile)
+            VALUES (${esc(nombre)}, ${durSql}, ${esc(sols)}, ${esc(info)}) RETURNING *`;
+
+      const { data, error } = await execSQL(sql);
+      if (error) { showAlert(alertC, 'error', error); return; }
+      const s = getSession();
+      await logAudit(s.user.id, id ? 'UPDATE' : 'INSERT',
+        { nombre, duracion: dur }, 'baile', data && data[0] ? data[0].id : null);
+      showAlert(alertC, 'success', id ? 'Baile actualizado' : 'Baile creado');
+      closeModal('modal');
+      await reload();
+    });
+
+    await reload();
+  </script>
+</body>
+</html>
