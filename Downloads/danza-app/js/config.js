@@ -11,14 +11,26 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 // Devuelve { data, error } donde data es array (SELECT/RETURNING)
 // o { success, rows_affected } para INSERT/UPDATE/DELETE sin RETURNING.
 export async function execSQL(query) {
-  const { data, error } = await supabase.rpc('exec_sql', { query });
-  if (error) {
-    console.error('RPC error:', error);
-    return { data: null, error: error.message };
-  }
-  if (data && typeof data === 'object' && !Array.isArray(data) && data.error) {
-    console.error('SQL error:', data.error);
-    return { data: null, error: data.error };
-  }
-  return { data, error: null };
+    const { getSession } = await import('./auth.js');
+    const session = getSession();
+    const p_rol           = session?.user?.rol           ?? 'readonly';
+    const p_usuario       = session?.user?.id            ?? null;
+    const p_id_integrante = session?.user?.id_integrante ?? null;
+
+    const { data, error } = await supabase.rpc('exec_sql', {
+        query,
+        p_rol,
+        p_usuario,
+        p_id_integrante
+    });
+
+    if (error) {
+        console.error('RPC error:', error);
+        return { data: null, error: error.message };
+    }
+    if (data && typeof data === 'object' && !Array.isArray(data) && data.error) {
+        console.error('SQL error:', data.error);
+        return { data: null, error: data.error };
+    }
+    return { data, error: null };
 }
