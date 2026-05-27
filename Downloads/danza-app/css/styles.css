@@ -1,7 +1,7 @@
 :root {
-  --primary: #6d28d9;
-  --primary-hover: #5b21b6;
-  --bg: #f8fafc;
+  --primary: #fd0400e4;
+  --primary-hover: #d46a6a;
+  --bg: #f8fafc64;
   --surface: #ffffff;
   --border: #e2e8f0;
   --text: #0f172a;
@@ -16,6 +16,24 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh;
 }
+
+.form-body{
+  display:grid;
+  align-items:self-end ;
+  justify-content:center;
+  gap:12px;
+}
+.form-body img {
+width:400px;
+height:auto;
+}
+.text {
+  text-align:center ;
+  font-size:2rem;
+  font-weight:600;
+  color:#b91c1c
+}
+
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
