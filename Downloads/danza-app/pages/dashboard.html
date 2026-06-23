@@ -24,7 +24,7 @@
     </div>
 
 <div class="card">
-  <h2>Control de asistencia</h2>
+  <h2>👥 Control de asistencia</h2>
 <div id="asistencia-form-container"></div>
   <div class="table-wrap">
     <table>
@@ -41,11 +41,6 @@
     </table>
   </div>
 </div>
-<div class="card">
-  <h2>Inventario disponible</h2>
-  <canvas id="chartInventario"></canvas>
-</div>
-
 <div
   class="card"
   id="mis-observaciones-card"
@@ -64,9 +59,14 @@
 <tbody id="mis-observaciones"></tbody>
   </table>
 </div>
+<div class="card">
+  <h2>📦 Inventario disponible</h2>
+  <canvas id="chartInventario"></canvas>
+</div>
+
 
     <div class="card">
-      <h2>Última actividad</h2>
+      <h2>📝 Última actividad</h2>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Cuándo</th><th>Usuario</th><th>Acción</th><th>Tabla</th></tr></thead>
@@ -155,12 +155,20 @@ document.addEventListener(
         document.getElementById(
           'asis-fecha'
         ).value;
-
+if (!fecha) {
+  alert('Selecciona una fecha');
+  return;
+}
       const asistio =
         document.getElementById(
           'asis-estado'
         ).value;
-
+console.log({
+  integrante,
+  fecha,
+  asistio,
+  observacion
+});
       const res = await execSQL(`
         INSERT INTO asistencia(
           id_integrante,
@@ -174,7 +182,11 @@ document.addEventListener(
           ${asistio},
          '${observacion.replace(/'/g,"''")}'
         )
-      `);
+ON CONFLICT (id_integrante, fecha)
+DO UPDATE SET
+  asistio = EXCLUDED.asistio,
+  observacion = EXCLUDED.observacion
+`);
 
       if (!res.error) {
         alert(
@@ -425,7 +437,7 @@ document.getElementById('chartParticipaciones'),
 {
   type:'bar',
   data:{
-    labels: part.map(x => x.nombre),
+    labels: part.data.map(x => x.nombre),
     datasets:[{
       label:'Participaciones',
       data: part.data.map(x => x.total)
