@@ -10,9 +10,11 @@
 <body>
   <div class="container" id="main" style="display: none;">
     <div class="page-header"><h1>Resumen general</h1></div>
+    <div class="kpi-grid" id="kpis"></div>
     <div class="dashboard-grid" id="stats"></div>
     <div class="card">
-      <h2>Próximas presentaciones</h2>
+      <h2>📅Próximas presentaciones</h2>
+      
       <div class="table-wrap">
         <table>
           <thead><tr><th>Fecha</th><th>Lugar</th><th>Cuadros</th></tr></thead>
@@ -20,21 +22,10 @@
         </table>
       </div>
     </div>
-  
-
-<div class="card">
-  <h2>Inventario disponible</h2>
-  <canvas id="chartInventario"></canvas>
-</div>
-
-<div class="card">
-  <h2>Presentaciones por año</h2>
-  <canvas id="chartPresentaciones"></canvas>
-</div>
 
 <div class="card">
   <h2>Control de asistencia</h2>
-
+<div id="asistencia-form-container"></div>
   <div class="table-wrap">
     <table>
       <thead>
@@ -50,6 +41,29 @@
     </table>
   </div>
 </div>
+<div class="card">
+  <h2>Inventario disponible</h2>
+  <canvas id="chartInventario"></canvas>
+</div>
+
+<div
+  class="card"
+  id="mis-observaciones-card"
+  style="display:none;"
+>
+  <h2>Mis observaciones</h2>
+
+  <table id="tabla-observaciones">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Asistencia</th>
+        <th>Observación</th>
+      </tr>
+    </thead>
+<tbody id="mis-observaciones"></tbody>
+  </table>
+</div>
 
     <div class="card">
       <h2>Última actividad</h2>
@@ -62,7 +76,7 @@
     </div>
   </div>
   <script type="module">
-    import { requireAuth } from '/js/auth.js';
+    import { requireAuth, getSession } from '/js/auth.js';
     import { execSQL } from '/js/config.js';
     import { renderNavbar, formatDateTime } from '/js/ui.js';
 
@@ -71,6 +85,109 @@
     document.getElementById('main').style.display = 'block';
 
     const stats = document.getElementById('stats');
+    const kpis = document.getElementById('kpis');
+
+    const session = getSession();
+    if (session.user.rol === 'admin') {
+
+  const { data: integrantes } =
+    await execSQL(`
+      SELECT id,nombre
+      FROM integrante
+      ORDER BY nombre
+    `);
+
+  const cont =
+    document.getElementById(
+      'asistencia-form-container'
+    );
+
+  cont.innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <h3>Registrar asistencia</h3>
+
+      <select id="asis-integrante">
+  ${integrantes.map(i => `
+    <option value="${i.id}">
+      ${i.nombre}
+    </option>
+  `).join('')}
+</select>
+
+<input type="date" id="asis-fecha">
+
+<select id="asis-estado">
+  <option value="true">Asistió</option>
+  <option value="false">Faltó</option>
+</select>
+
+<textarea
+  id="asis-observacion"
+  placeholder="Observaciones..."
+  rows="3"
+></textarea>
+
+<button id="guardar-asistencia">
+  Guardar
+</button>
+    </div>
+  `;
+}
+document.addEventListener(
+  'click',
+  async e => {
+
+    if (
+      e.target.id ===
+      'guardar-asistencia'
+    ) {
+      const observacion =
+         document.getElementById(
+           'asis-observacion'
+         ).value.trim();
+
+      const integrante =
+        document.getElementById(
+          'asis-integrante'
+        ).value;
+
+      const fecha =
+        document.getElementById(
+          'asis-fecha'
+        ).value;
+
+      const asistio =
+        document.getElementById(
+          'asis-estado'
+        ).value;
+
+      const res = await execSQL(`
+        INSERT INTO asistencia(
+          id_integrante,
+          fecha,
+          asistio,
+          observacion
+        )
+        VALUES(
+          ${integrante},
+          '${fecha}',
+          ${asistio},
+         '${observacion.replace(/'/g,"''")}'
+        )
+      `);
+
+      if (!res.error) {
+        alert(
+          'Asistencia registrada'
+        );
+
+        location.reload();
+      } else {
+        alert(res.error);
+      }
+    }
+  }
+);
     const queries = [
   { label: 'Total Integrantes', sql: 'SELECT COUNT(*) AS n FROM integrante' },
   { label: 'Total Bailes', sql: 'SELECT COUNT(*) AS n FROM baile' },
@@ -109,7 +226,85 @@
     } else {
       proxTbody.innerHTML = '<tr><td colspan="3" class="empty">No hay presentaciones futuras</td></tr>';
     }
+    if (proximas.data?.length) {
 
+  const prox = proximas.data[0];
+
+  const dias = Math.ceil(
+    (new Date(prox.fecha) - new Date())
+    / (1000 * 60 * 60 * 24)
+  );
+
+  kpis.insertAdjacentHTML(
+    'beforeend',
+    `
+    <div class="stat-card">
+      <div class="label">
+        📅 Próxima presentación
+      </div>
+
+      <div class="value">
+        ${dias} días
+      </div>
+
+      <small>${prox.lugar}</small>
+    </div>
+    `
+  );
+}
+if (
+  session.user.rol === 'integrante'
+  && session.user.id_integrante
+) {
+
+  document
+    .getElementById('mis-observaciones-card')
+    .style.display = 'block';
+
+  const obs = await execSQL(`
+    SELECT
+      fecha,
+      asistio,
+      observacion
+    FROM asistencia
+    WHERE id_integrante =
+      ${session.user.id_integrante}
+    ORDER BY fecha DESC
+  `);
+
+  const tbody =
+    document.getElementById(
+      'mis-observaciones'
+    );
+
+  if (obs.data) {
+
+    obs.data.forEach(r => {
+
+      tbody.insertAdjacentHTML(
+        'beforeend',
+        `
+        <tr>
+          <td>${formatDateTime(r.fecha)}</td>
+          <td>
+            ${
+              r.asistio
+                ? 'Asistió'
+                : 'Faltó'
+            }
+          </td>
+          <td>
+            ${r.observacion || ''}
+          </td>
+        </tr>
+        `
+      );
+
+    });
+
+  }
+
+}
     const audit = await execSQL(`
       SELECT a.created_at, a.accion, a.tabla_afectada, u.email
         FROM audit_log a
@@ -161,12 +356,52 @@ if (asistencia.data) {
         <td>${r.nombre}</td>
         <td>${r.asistencias}</td>
         <td>${r.faltas}</td>
-        <td>${r.porcentaje}%</td>
+        <td>
+<span class="${
+Number(r.porcentaje) >= 85
+? 'badge-success'
+: Number(r.porcentaje) < 70
+? 'badge-danger'
+: 'badge-warning'
+}">
+${r.porcentaje}%
+</span>
+</td>
       </tr>
     `);
 
   });
 }
+const promedio = await execSQL(`
+SELECT
+ROUND(
+AVG(
+CASE
+WHEN asistio THEN 100
+ELSE 0
+END
+),2
+) promedio
+FROM asistencia
+`);
+
+const p =
+promedio.data?.[0]?.promedio || 0;
+
+kpis.insertAdjacentHTML(
+'beforeend',
+`
+<div class="stat-card">
+<div class="label">
+👥 Asistencia promedio
+</div>
+
+<div class="value">
+${p}%
+</div>
+</div>
+`
+);
 
 } catch(e) {
   console.log('Tabla asistencia no encontrada');
@@ -193,7 +428,7 @@ document.getElementById('chartParticipaciones'),
     labels: part.map(x => x.nombre),
     datasets:[{
       label:'Participaciones',
-      data: part.map(x => x.total)
+      data: part.data.map(x => x.total)
     }]
   }
 });
@@ -201,6 +436,26 @@ document.getElementById('chartParticipaciones'),
 } catch(e) {
   console.log(e);
 }
+const critico = await execSQL(`
+SELECT COUNT(*) AS total
+FROM inventario
+WHERE cantidad_total < 5
+`);
+
+kpis.insertAdjacentHTML(
+'beforeend',
+`
+<div class="stat-card">
+  <div class="label">
+    📦 Inventario crítico
+  </div>
+
+  <div class="value">
+    ${critico.data[0].total}
+  </div>
+</div>
+`
+);
 try {
 
 const inv = await execSQL(`
@@ -220,33 +475,6 @@ document.getElementById('chartInventario'),
     labels:inv.data.map(x => x.nombre),
     datasets:[{
       data:inv.data.map(x => x.cantidad_total)
-    }]
-  }
-});
-
-} catch(e) {
-  console.log(e);
-}
-try {
-
-const pres = await execSQL(`
-SELECT
-EXTRACT(YEAR FROM fecha) anio,
-COUNT(*) total
-FROM presentacion
-GROUP BY anio
-ORDER BY anio
-`);
-
-new Chart(
-document.getElementById('chartPresentaciones'),
-{
-  type:'line',
-  data:{
-    labels:pres.data.map(x => x.anio),
-    datasets:[{
-      label:'Presentaciones',
-      data:pres.data.map(x => x.total)
     }]
   }
 });
