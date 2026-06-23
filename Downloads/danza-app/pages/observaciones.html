@@ -50,11 +50,23 @@
     import { renderNavbar, showAlert, openModal, closeModal } from '/js/ui.js';
     import { loadRows, deleteRow, esc } from '/js/crud.js';
 
-    if (!requireAuth()) throw new Error('redirect');
-    renderNavbar('observaciones');
-    document.getElementById('main').style.display = 'block';
+if (!requireAuth()) throw new Error('redirect');
 
-    const tbody = document.getElementById('tbody');
+renderNavbar('observaciones');
+
+const session = getSession();
+
+console.log('ROL:', session?.user?.rol);
+
+const esAdmin = ['usuario', 'admin'].includes(
+  String(session?.user?.rol || '').toLowerCase()
+);
+
+document.getElementById('main').style.display = 'block';
+
+if (!esAdmin) {
+  document.getElementById('new-btn').style.display = 'none';
+}
     const alertC = document.getElementById('alert-container');
 
     async function loadDropdowns() {
@@ -78,10 +90,18 @@
           <td>${r.presentacion || '—'}</td>
           <td>${r.ensayo || '—'}</td>
           <td>${r.notas ? r.notas.slice(0, 60) + (r.notas.length > 60 ? '…' : '') : '—'}</td>
-          <td><div class="actions">
-            <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
-            <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
-          </div></td>
+   <td>
+${
+  esAdmin
+    ? `
+    <div class="actions">
+      <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
+      <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
+    </div>
+    `
+    : ''
+}
+</td>
         </tr>
       `);
       window._rows = rows;

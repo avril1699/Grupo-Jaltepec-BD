@@ -3,57 +3,91 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Iniciar sesión — Grupo Jaltepec</title>
+  <title>Grupo Jaltepec</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
 
 <body>
-  <div class="form-body">
-    <img src="Imagen/WhatsApp Image 2026-05-27 at 13.27.44.jpeg" alt="login-container">
+  <body>
 
-  </div>
+<div class="login-page">
 
-  <div class="login-container">
-    <h1>Bienvenido a Grupo Jaltepec</h1>
-    <p class="subtitle">Sistema de administración</p>
-    <div class="card">
-      <h2>Iniciar sesión</h2>
-      <div id="alert-container"></div>
-      <form id="login-form">
-        <div class="form-group">
-          <label for="email">Correo electrónico</label>
-          <input type="email" id="email" required autocomplete="email" placeholder="admin@compania.pe" />
+    <div class="left-panel"></div>
+        
+    <div class="right-panel">
+
+    <div class="login-card">
+
+        <div class="logo-content">
+            <h1>Grupo Jaltepec</h1>
+            <p>Sistema de Administración</p>
         </div>
-        <div class="form-group">
-          <label for="password">Contraseña</label>
-          <input type="password" id="password" required autocomplete="current-password" placeholder="••••••••" />
+
+        <div class="avatar">
+            <img src="/Imagen/avatar.png" alt="Avatar">
         </div>
-        <button type="submit" id="submit-btn" style="width: 100%; justify-content: center;">Ingresar</button>
-      </form>
+
+        <div id="alert-container"></div>
+
+        <form id="login-form">
+
+            <div class="input-group">
+                <input
+                    type="email"
+                    id="email"
+                    placeholder="Correo electrónico"
+                    required>
+            </div>
+
+            <div class="input-group">
+                <input
+                    type="password"
+                    id="password"
+                    placeholder="Contraseña"
+                    required>
+            </div>
+
+            <button type="submit" id="submit-btn">
+                Iniciar sesión
+            </button>
+
+        </form>
+
     </div>
-  </div>
-  <script type="module">
-    import { login, getSession } from '/js/auth.js';
-    import { showAlert } from '/js/ui.js';
-    if (getSession()) window.location.href = '/pages/dashboard.html';
-    const form = document.getElementById('login-form');
-    const alertC = document.getElementById('alert-container');
-    const btn = document.getElementById('submit-btn');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      btn.disabled = true;
-      btn.textContent = 'Ingresando...';
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      const result = await login(email, password);
-      if (result.ok) {
-        window.location.href = '/pages/dashboard.html';
-      } else {
-        showAlert(alertC, 'error', result.error);
-        btn.disabled = false;
-        btn.textContent = 'Ingresar';
-      }
-    });
-  </script>
+
+</div>
+<script type="module">
+import { login, getSession } from '/js/auth.js';
+import { showAlert } from '/js/ui.js';
+
+if (getSession()) {
+  window.location.href = '/pages/dashboard.html';
+}
+
+const form = document.getElementById('login-form');
+const alertC = document.getElementById('alert-container');
+const btn = document.getElementById('submit-btn');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  btn.disabled = true;
+  btn.textContent = 'Ingresando...';
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  const result = await login(email, password);
+
+  if (result.ok) {
+    window.location.href = '/pages/dashboard.html';
+  } else {
+    showAlert(alertC, 'error', result.error);
+    btn.disabled = false;
+    btn.textContent = 'LOGIN';
+  }
+});
+</script>
+
 </body>
 </html>

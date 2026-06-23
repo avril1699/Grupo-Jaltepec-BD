@@ -56,9 +56,18 @@
     if (!requireAuth()) throw new Error('redirect');
     renderNavbar('participaciones');
     document.getElementById('main').style.display = 'block';
+    
 
     const tbody = document.getElementById('tbody');
     const alertC = document.getElementById('alert-container');
+    const session = getSession();
+    const esAdmin =
+    session?.user?.rol === 'usuario' ||
+    session?.user?.rol === 'admin';
+
+    if (!esAdmin) {
+    document.getElementById('new-btn').style.display = 'none';
+    }
 
     async function loadDropdowns() {
       const { data: ints }   = await execSQL('SELECT id, nombre FROM integrante ORDER BY nombre');
@@ -75,6 +84,8 @@
         `<option value="${b.id}">${b.nombre}</option>`));
     }
 
+    
+    
     async function reload() {
       const rows = await loadRows(`
         SELECT pe.*, i.nombre AS integrante_nombre, b.nombre AS baile_nombre
@@ -89,10 +100,18 @@
           <td>${r.rol || '—'}</td>
           <td>${formatDate(r.fecha_inicio)}</td>
           <td>${formatDate(r.fecha_fin)}</td>
-          <td><div class="actions">
-            <button class="btn-secondary btn-sm" data-edit="1">Editar</button>
-            <button class="btn-danger btn-sm" data-del="1">Borrar</button>
-          </div></td>
+          <td>
+  ${
+    esAdmin
+      ? `
+      <div class="actions">
+        <button class="btn-secondary btn-sm" data-edit="1">Editar</button>
+        <button class="btn-danger btn-sm" data-del="1">Borrar</button>
+      </div>
+      `
+      : ''
+  }
+</td>
         </tr>
       `);
       window._rows = rows;

@@ -1,7 +1,7 @@
 :root {
   --primary: #fd0400e4;
   --primary-hover: #d46a6a;
-  --bg: #f8fafc64;
+  --bg: #f8fafcda;
   --surface: #ffffff;
   --border: #e2e8f0;
   --text: #0f172a;
@@ -140,4 +140,135 @@ tbody tr:hover { background: var(--bg); }
   .navbar { flex-direction: column; align-items: flex-start; }
   .container { padding: 1rem; }
   th, td { padding: 0.5rem; font-size: 0.825rem; }
+}
+
+/* LOGIN ESTILO MODERNO */
+
+.login-page{
+    display:flex;
+    min-height:100vh;
+}
+
+.left-panel{
+    flex:1;
+
+    background-image:url('/Imagen/Fondo.png');
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+    overflow:hidden;
+}
+
+.logo-content{
+    color:white;
+    text-align:center;
+    z-index:2;
+}
+
+.logo-content h1{
+    font-size:3rem;
+    margin-bottom:10px;
+}
+
+.logo-content p{
+    font-size:1.2rem;
+}
+
+.right-panel{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#f5f5f5;
+}
+
+.login-card{
+    width:420px;
+    background:white;
+    padding:40px;
+    border-radius:10px;
+    box-shadow:0 10px 25px rgba(0,0,0,.15);
+}
+
+.avatar{
+    width:120px;
+    height:120px;
+
+    margin:0 auto 30px auto;
+
+    border:3px solid #d84315;
+    border-radius:50%;
+
+    overflow:hidden;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.avatar img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+}
+
+.input-group{
+    margin-bottom:20px;
+}
+
+.input-group input{
+    height:55px;
+    border:1px solid #dcdcdc;
+    font-size:16px;
+}
+
+#submit-btn{
+    width:100%;
+    height:55px;
+    border:none;
+    background:#d84315;
+    color:white;
+    font-size:18px;
+    font-weight:bold;
+    letter-spacing:2px;
+}
+
+#submit-btn:hover{
+    background:#bf360c;
+}
+
+@media(max-width:768px){
+
+    .login-page{
+        flex-direction:column;
+    }
+
+    .left-panel{
+        min-height:250px;
+    }
+
+    .login-card{
+        width:90%;
+    }
+}
+.logo-content{
+    text-align:center;
+    margin-bottom:25px;
+}
+
+.logo-content h1{
+    color:#333;
+    margin-bottom:5px;
+    font-size:32px;
+}
+
+.logo-content p{
+    color:#666;
+    font-size:16px;
 }

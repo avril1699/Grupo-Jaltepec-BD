@@ -56,6 +56,8 @@
 
     const tbody = document.getElementById('tbody');
     const alertC = document.getElementById('alert-container');
+    const session = getSession();
+    const esAdmin = session?.user?.rol === 'admin';
 
     async function reload() {
       const rows = await loadRows(
@@ -67,10 +69,22 @@
             <td>${formatDate(r.fecha_nacimiento)}</td>
             <td>${formatDate(r.fecha_ingresso)}</td>
             <td>${r.observaciones_medicas ? r.observaciones_medicas.slice(0, 60) + (r.observaciones_medicas.length > 60 ? '…' : '') : '—'}</td>
-            <td><div class="actions">
-              <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
-              <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
-            </div></td>
+            <td>
+  ${
+    esAdmin ||
+    (
+      session?.user?.rol === 'integrante' &&
+      session?.user?.id_integrante == r.id
+    )
+      ? `
+      <div class="actions">
+        <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
+        <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
+      </div>
+      `
+      : ''
+  }
+</td>
           </tr>
         `);
       window._rows = rows;

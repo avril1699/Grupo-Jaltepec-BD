@@ -45,9 +45,20 @@
     import { loadRows, deleteRow, esc } from '/js/crud.js';
 
     if (!requireAuth()) throw new Error('redirect');
-    renderNavbar('presentaciones');
-    document.getElementById('main').style.display = 'block';
 
+renderNavbar('presentaciones');
+
+const session = getSession();
+
+const esAdmin =
+  session?.user?.rol === 'usuario' ||
+  session?.user?.rol === 'admin';
+
+document.getElementById('main').style.display = 'block';
+
+if (!esAdmin) {
+  document.getElementById('new-btn').style.display = 'none';
+}
     const tbody = document.getElementById('tbody');
     const alertC = document.getElementById('alert-container');
 
@@ -64,10 +75,18 @@
           <td>${formatDateTime(r.fecha)}</td>
           <td>${r.lugar}</td>
           <td>${r.num_cuadros}</td>
-          <td><div class="actions">
-            <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
-            <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
-          </div></td>
+          <td>
+  ${
+    esAdmin
+      ? `
+      <div class="actions">
+        <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
+        <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
+      </div>
+      `
+      : ''
+  }
+</td>
         </tr>
       `);
       window._rows = rows;

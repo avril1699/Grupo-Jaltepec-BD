@@ -83,8 +83,23 @@
     import { loadRows, deleteRow, deleteCompositeRow, esc } from '/js/crud.js';
 
     if (!requireAuth()) throw new Error('redirect');
-    renderNavbar('inventario');
-    document.getElementById('main').style.display = 'block';
+
+renderNavbar('presentaciones');
+
+const session = getSession();
+
+const esAdmin =
+  session?.user?.rol === 'usuario' ||
+  session?.user?.rol === 'admin';
+
+document.getElementById('main').style.display = 'block';
+
+if (!esAdmin) {
+  if (!esAdmin) {
+  document.getElementById('new-btn').style.display = 'none';
+  document.getElementById('assign-btn').style.display = 'none';
+}
+}
 
     const tbItems = document.getElementById('tbody-items');
     const tbAsig  = document.getElementById('tbody-asig');
@@ -113,10 +128,18 @@
             <td>${r.nombre}</td>
             <td>${r.cantidad_total}</td>
             <td>${r.color || '—'}</td>
-            <td><div class="actions">
-              <button class="btn-secondary btn-sm" data-edit-item="${r.id}">Editar</button>
-              <button class="btn-danger btn-sm" data-del-item="${r.id}">Borrar</button>
-            </div></td>
+            <td>
+${
+  esAdmin
+    ? `
+    <div class="actions">
+      <button class="btn-secondary btn-sm" data-edit-asig="1">Editar</button>
+      <button class="btn-danger btn-sm" data-del-asig="1">Borrar</button>
+    </div>
+    `
+    : ''
+}
+</td>
           </tr>
         `);
       window._items = rows;
@@ -136,10 +159,19 @@
           <td>${formatDateTime(r.pres_fecha)} · ${r.pres_lugar}</td>
           <td>${r.cantidad_llevada}</td>
           <td>${r.observaciones || '—'}</td>
-          <td><div class="actions">
-            <button class="btn-secondary btn-sm" data-edit-asig="1">Editar</button>
-            <button class="btn-danger btn-sm" data-del-asig="1">Borrar</button>
-          </div></td>
+          <td>
+<td>
+${
+  esAdmin
+    ? `
+    <div class="actions">
+      <button class="btn-secondary btn-sm" data-edit-item="${r.id}">Editar</button>
+      <button class="btn-danger btn-sm" data-del-item="${r.id}">Borrar</button>
+    </div>
+    `
+    : ''
+}
+</td>
         </tr>
       `);
       window._asig = rows;
