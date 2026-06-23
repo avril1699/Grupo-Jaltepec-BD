@@ -6,6 +6,7 @@
   <title>Inicio — Grupo Jaltepec</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <body>
   <div class="container" id="main" style="display: none;">
     <div class="page-header"><h1>Resumen general</h1></div>
@@ -19,6 +20,40 @@
         </table>
       </div>
     </div>
+    <div class="card">
+  <h2>Participaciones por integrante</h2>
+  <canvas id="chartParticipaciones"></canvas>
+</div>
+
+<div class="card">
+  <h2>Inventario disponible</h2>
+  <canvas id="chartInventario"></canvas>
+</div>
+
+<div class="card">
+  <h2>Presentaciones por año</h2>
+  <canvas id="chartPresentaciones"></canvas>
+</div>
+
+<div class="card">
+  <h2>Control de asistencia</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Integrante</th>
+          <th>Asistencias</th>
+          <th>Faltas</th>
+          <th>%</th>
+        </tr>
+      </thead>
+
+      <tbody id="asistencia-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
     <div class="card">
       <h2>Última actividad</h2>
       <div class="table-wrap">
@@ -40,13 +75,15 @@
 
     const stats = document.getElementById('stats');
     const queries = [
-      { label: 'Integrantes',      sql: 'SELECT COUNT(*) AS n FROM integrante' },
-      { label: 'Bailes',           sql: 'SELECT COUNT(*) AS n FROM baile' },
-      { label: 'Presentaciones',   sql: 'SELECT COUNT(*) AS n FROM presentacion' },
-      { label: 'Cuadros',          sql: 'SELECT COUNT(*) AS n FROM cuadro' },
-      { label: 'Ítems inventario', sql: 'SELECT COUNT(*) AS n FROM inventario' },
-      { label: 'Observaciones',    sql: 'SELECT COUNT(*) AS n FROM observacion' }
-    ];
+  { label: 'Total Integrantes', sql: 'SELECT COUNT(*) AS n FROM integrante' },
+  { label: 'Total Bailes', sql: 'SELECT COUNT(*) AS n FROM baile' },
+  { label: 'Total Presentaciones', sql: 'SELECT COUNT(*) AS n FROM presentacion' },
+  { label: 'Total Cuadros', sql: 'SELECT COUNT(*) AS n FROM cuadro' },
+  {
+    label: 'Inventario Total',
+    sql: 'SELECT COALESCE(SUM(cantidad_total),0) AS n FROM inventario'
+  }
+];
     for (const q of queries) {
       const { data } = await execSQL(q.sql);
       const value = data && data[0] ? data[0].n : '?';
@@ -96,6 +133,130 @@
     } else {
       auditTbody.innerHTML = '<tr><td colspan="4" class="empty">Sin actividad reciente</td></tr>';
     }
+    try {
+
+const asistencia = await execSQL(`
+SELECT
+i.nombre,
+SUM(CASE WHEN a.asistio THEN 1 ELSE 0 END) asistencias,
+SUM(CASE WHEN a.asistio THEN 0 ELSE 1 END) faltas,
+ROUND(
+100.0 *
+SUM(CASE WHEN a.asistio THEN 1 ELSE 0 END)
+/ NULLIF(COUNT(*),0),
+2
+) porcentaje
+FROM asistencia a
+JOIN integrante i
+ON i.id = a.id_integrante
+GROUP BY i.nombre
+ORDER BY porcentaje DESC
+`);
+
+const asistenciaTbody =
+document.getElementById('asistencia-tbody');
+
+if (asistencia.data) {
+  asistencia.data.forEach(r => {
+
+    asistenciaTbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${r.nombre}</td>
+        <td>${r.asistencias}</td>
+        <td>${r.faltas}</td>
+        <td>${r.porcentaje}%</td>
+      </tr>
+    `);
+
+  });
+}
+
+} catch(e) {
+  console.log('Tabla asistencia no encontrada');
+}
+try {
+
+const part = await execSQL(`
+SELECT
+i.nombre,
+COUNT(*) total
+FROM participacion p
+JOIN integrante i
+ON i.id = p.id_integrante
+GROUP BY i.nombre
+ORDER BY total DESC
+LIMIT 10
+`);
+
+new Chart(
+document.getElementById('chartInventario'),
+{
+  type:'bar',
+  data:{
+    labels:inv.data.map(x => x.nombre),
+    datasets:[{
+      label:'Usos',
+      data:inv.data.map(x => x.total)
+    }]
+  }
+});
+
+} catch(e) {
+  console.log(e);
+}
+try {
+
+const inv = await execSQL(`
+SELECT
+nombre,
+cantidad_total
+FROM inventario
+ORDER BY cantidad_total DESC
+LIMIT 10
+`);
+
+new Chart(
+document.getElementById('chartInventario'),
+{
+  type:'pie',
+  data:{
+    labels:inv.data.map(x => x.nombre),
+    datasets:[{
+      data:inv.data.map(x => x.cantidad_total)
+    }]
+  }
+});
+
+} catch(e) {
+  console.log(e);
+}
+try {
+
+const pres = await execSQL(`
+SELECT
+EXTRACT(YEAR FROM fecha) anio,
+COUNT(*) total
+FROM presentacion
+GROUP BY anio
+ORDER BY anio
+`);
+
+new Chart(
+document.getElementById('chartPresentaciones'),
+{
+  type:'line',
+  data:{
+    labels:pres.data.map(x => x.anio),
+    datasets:[{
+      label:'Presentaciones',
+      data:pres.data.map(x => x.total)
+    }]
+  }
+});
+
+} catch(e) {
+  console.log(e);
+}
   </script>
 </body>
 </html>
