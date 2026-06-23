@@ -20,10 +20,7 @@
         </table>
       </div>
     </div>
-    <div class="card">
-  <h2>Participaciones por integrante</h2>
-  <canvas id="chartParticipaciones"></canvas>
-</div>
+  
 
 <div class="card">
   <h2>Inventario disponible</h2>
@@ -179,8 +176,8 @@ try {
 const part = await execSQL(`
 SELECT
 i.nombre,
-COUNT(*) total
-FROM participacion p
+COUNT(*) AS total
+FROM participa_en p
 JOIN integrante i
 ON i.id = p.id_integrante
 GROUP BY i.nombre
@@ -189,14 +186,14 @@ LIMIT 10
 `);
 
 new Chart(
-document.getElementById('chartInventario'),
+document.getElementById('chartParticipaciones'),
 {
   type:'bar',
   data:{
-    labels:inv.data.map(x => x.nombre),
+    labels: part.map(x => x.nombre),
     datasets:[{
-      label:'Usos',
-      data:inv.data.map(x => x.total)
+      label:'Participaciones',
+      data: part.map(x => x.total)
     }]
   }
 });
