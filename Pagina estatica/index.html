@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grupo Jaltepec — Sistema de Administración</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* ===== VARIABLES ===== */
+    :root {
+      --primary: #d84315;
+      --primary-hover: #bf360c;
+      --bg: #f8fafcda;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; }
+    a { color: var(--primary); text-decoration: none; }
+
+    /* ===== NAVBAR ===== */
+    .navbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; position: sticky; top: 0; z-index: 40; box-shadow: var(--shadow); }
+    .navbar h1 { font-size: 1.15rem; color: var(--primary); white-space: nowrap; }
+    .nav-links { display: flex; gap: 0.2rem; flex-wrap: wrap; }
+    .nav-links a { color: var(--text); font-size: 0.85rem; padding: 0.35rem 0.7rem; border-radius: var(--radius); cursor: pointer; }
+    .nav-links a:hover, .nav-links a.active { background: var(--bg); text-decoration: none; color: var(--primary); }
+    .user-info { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+    .user-info span { color: var(--text-muted); }
+
+    /* ===== LAYOUT ===== */
+    .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+    .page { display: none; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem; }
+    .page-header h1 { font-size: 1.4rem; }
+
+    /* ===== CARDS ===== */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow); }
+    .card h2 { font-size: 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 6px; }
+    .card h3 { font-size: 0.95rem; margin-bottom: 0.75rem; }
+
+    /* ===== FORMS ===== */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.35rem; }
+    input, select, textarea { width: 100%; padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; font-family: inherit; background: var(--surface); color: var(--text); }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(216,67,21,0.1); }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* ===== BUTTONS ===== */
+    button, .btn { background: var(--primary); color: white; border: none; padding: 0.55rem 1.1rem; border-radius: var(--radius); font-size: 0.9rem; font-weight: 500; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 0.4rem; transition: background 0.15s; }
+    button:hover, .btn:hover { background: var(--primary-hover); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--bg); }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
+    .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    /* ===== TABLES ===== */
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 0.7rem 0.85rem; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg); font-weight: 600; font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    tbody tr:hover { background: #fafafa; }
+    .table-wrap { overflow-x: auto; }
+    .empty { text-align: center; padding: 2.5rem; color: var(--text-muted); font-size: 0.9rem; }
+
+    /* ===== BADGES ===== */
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 500; background: var(--bg); color: var(--text-muted); }
+    .badge-admin { background: #ede9fe; color: #6d28d9; }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-danger { background: #fee2e2; color: #991b1b; }
+
+    /* ===== ALERTS ===== */
+    .alert { padding: 0.75rem 1rem; border-radius: var(--radius); font-size: 0.9rem; margin-bottom: 1rem; }
+    .alert-error   { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: var(--success); border: 1px solid #bbf7d0; }
+    .alert-info    { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+
+    /* ===== MODALS ===== */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: var(--surface); border-radius: var(--radius); padding: 1.5rem; max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; }
+    .modal h2 { margin-bottom: 1rem; font-size: 1.1rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; }
+
+    /* ===== DASHBOARD ===== */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; box-shadow: var(--shadow); }
+    .stat-card .label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .stat-card .value { font-size: 1.7rem; font-weight: 700; color: var(--primary); }
+    .stat-card small { font-size: 0.8rem; color: var(--text-muted); }
+
+    /* ===== LOGIN ===== */
+    #page-login { display: flex; min-height: 100vh; }
+    .left-panel { flex: 1; background-image: url('Imagen/Fondo.png'); background-size: cover; background-position: center; background-repeat: no-repeat; display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden; }
+    .left-panel::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,0.3); }
+    .left-panel-content { position:relative; z-index:2; color:white; text-align:center; padding:2rem; }
+    .left-panel-content h1 { font-size: 2.8rem; margin-bottom: 10px; text-shadow:0 2px 8px rgba(0,0,0,0.5); }
+    .left-panel-content p { font-size: 1.1rem; opacity:0.9; }
+    .right-panel { flex: 1; display: flex; justify-content: center; align-items: center; background: #f5f5f5; }
+    .login-card { width: 420px; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+    .logo-content { text-align: center; margin-bottom: 25px; }
+    .logo-content h1 { color: #333; margin-bottom: 5px; font-size: 28px; }
+    .logo-content p { color: #666; font-size: 15px; }
+    .avatar { width: 110px; height: 110px; margin: 0 auto 28px auto; border: 3px solid var(--primary); border-radius: 50%; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .input-group { margin-bottom: 18px; }
+    .input-group input { height: 52px; border: 1px solid #dcdcdc; font-size: 15px; border-radius: 8px; }
+    #submit-btn { width: 100%; height: 52px; border: none; background: var(--primary); color: white; font-size: 17px; font-weight: bold; letter-spacing: 1.5px; border-radius: 8px; }
+    #submit-btn:hover { background: var(--primary-hover); }
+    .hint-text { text-align: center; margin-top: 14px; font-size: 0.8rem; color: var(--text-muted); }
+    .hint-text span { display: inline-block; margin: 2px 0; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      #page-login { flex-direction: column; }
+      .left-panel { min-height: 200px; }
+      .login-card { width: 90%; padding: 28px; }
+      .navbar { flex-direction: column; align-items: flex-start; }
+      .container { padding: 1rem; }
+      th, td { padding: 0.5rem; font-size: 0.82rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR (se inyecta dinámicamente) -->
+<div id="navbar"></div>
+
+<!-- ===== LOGIN ===== -->
+<div id="page-login" class="page">
+  <div class="left-panel">
+    <div class="left-panel-content">
+      <h1>Grupo Jaltepec</h1>
+      <p>Sistema de Administración</p>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="login-card">
+      <div class="logo-content">
+        <h1>Grupo Jaltepec</h1>
+        <p>Sistema de Administración</p>
+      </div>
+      <div class="avatar">
+        <img src="Imagen/avatar.png" alt="Avatar">
+      </div>
+      <div id="alert-login"></div>
+      <form id="login-form">
+        <div class="input-group">
+          <input type="email" id="email" placeholder="Correo electrónico" required>
+        </div>
+        <div class="input-group">
+          <input type="password" id="password" placeholder="Contraseña" required>
+        </div>
+        <button type="submit" id="submit-btn">Iniciar sesión</button>
+      </form>
+     
+    </div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="page-dashboard" class="page">
+  <div class="container">
+    <div class="page-header"><h1>Resumen general</h1></div>
+    <div class="kpi-grid" id="kpis"></div>
+    <div class="dashboard-grid">
+      <div class="stat-card"><div class="label">👥 Integrantes</div><div class="value" id="stat-integrantes">—</div></div>
+      <div class="stat-card"><div class="label">💃 Bailes</div><div class="value" id="stat-bailes">—</div></div>
+      <div class="stat-card"><div class="label">🎭 Presentaciones</div><div class="value" id="stat-presentaciones">—</div></div>
+      <div class="stat-card"><div class="label">📋 Cuadros</div><div class="value" id="stat-cuadros">—</div></div>
+      <div class="stat-card"><div class="label">📦 Inventario total</div><div class="value" id="stat-inventario">—</div></div>
+    </div>
+    <div class="card">
+      <h2>📅 Próximas presentaciones</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Lugar</th><th>Cuadros</th></tr></thead>
+          <tbody id="proximas-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="asistencia-form-container"></div>
+    <div class="card">
+      <h2>👥 Control de asistencia</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Integrante</th><th>Asistencias</th><th>Faltas</th><th>%</th></tr></thead>
+          <tbody id="asistencia-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" id="mis-observaciones-card" style="display:none">
+      <h2>💃 Mis observaciones</h2>
+      <table>
+        <thead><tr><th>Fecha</th><th>Asistencia</th><th>Observación</th></tr></thead>
+        <tbody id="mis-observaciones"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>📦 Inventario disponible</h2>
+      <canvas id="chartInventario" style="max-height:300px"></canvas>
+    </div>
+    <div class="card">
+      <h2>📝 Última actividad</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cuándo</th><th>Usuario</th><th>Acción</th><th>Tabla</th></tr></thead>
+          <tbody id="audit-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== INTEGRANTES ===== -->
+<div id="page-integrantes" class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Integrantes</h1>
+      <button id="new-integrante">+ Nuevo integrante</button>
+    </div>
+    <div id="alert-integrantes"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Nacimiento</th><th>Ingreso</th><th>Obs. médicas</th><th></th></tr></thead>
+          <tbody id="tbody-integrantes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-integrante">
+  <div class="modal">
+    <h2 id="modal-int-title">Nuevo integrante</h2>
+    <div class="form-group"><label>Nombre completo</label><input type="text" id="fi-int-nombre" required maxlength="250"></div>
+    <div class="form-group"><label>Fecha de nacimiento</label><input type="date" id="fi-int-nac"></div>
+    <div class="form-group"><label>Fecha de ingreso</label><input type="date" id="fi-int-ing"></div>
+    <div class="form-group"><label>Observaciones médicas</label><textarea id="fi-int-obs" rows="3"></textarea></div>
+    <input type="hidden" id="fi-int-id">
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-integrante')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-integrante').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-integrante" style="display:none"></form>
+  </div>
+</div>
+
+<!-- ===== BAILES ===== -->
+<div id="page-bailes" class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Bailes</h1>
+      <button id="new-baile">+ Nuevo baile</button>
+    </div>
+    <div id="alert-bailes"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Duración</th><th>Solistas</th><th>Información</th><th></th></tr></thead>
+          <tbody id="tbody-bailes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-baile">
+  <div class="modal">
+    <h2 id="modal-baile-title">Nuevo baile</h2>
+    <div class="form-group"><label>Nombre del baile</label><input type="text" id="fi-baile-nombre" required maxlength="250"></div>
+    <div class="form-group"><label>Duración (HH:MM:SS)</label><input type="text" id="fi-baile-dur" placeholder="00:05:30"></div>
+    <div class="form-group"><label>Solistas</label><input type="text" id="fi-baile-sol" placeholder="Nombres separados por coma"></div>
+    <div class="form-group"><label>Información del baile</label><textarea id="fi-baile-info" rows="3"></textarea></div>
+    <input type="hidden" id="fi-baile-id">
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-baile')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-baile').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-baile" style="display:none"></form>
+  </div>
+</div>
+
+<!-- ===== PARTICIPACIONES ===== -->
+<div id="page-participaciones" class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Participaciones</h1>
+      <button id="new-participacion">+ Nueva participación</button>
+    </div>
+    <div id="alert-participaciones"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Integrante</th><th>Baile</th><th>Rol</th><th>Inicio</th><th></th></tr></thead>
+          <tbody id="tbody-participaciones"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-participacion">
+  <div class="modal">
+    <h2 id="modal-part-title">Nueva participación</h2>
+    <input type="hidden" id="fi-part-orig-int">
+    <input type="hidden" id="fi-part-orig-bai">
+    <div class="form-group"><label>Integrante</label><select id="fi-part-int" required></select></div>
+    <div class="form-group"><label>Baile</label><select id="fi-part-baile" required></select></div>
+    <div class="form-group"><label>Rol</label><input type="text" id="fi-part-rol" placeholder="Ej: Dama principal, Caballero, Solista"></div>
+    <div class="form-group"><label>Fecha de inicio</label><input type="date" id="fi-part-inicio"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-participacion')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-participacion').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-participacion" style="display:none"></form>
+  </div>
+</div>
+
+<!-- ===== PRESENTACIONES ===== -->
+<div id="page-presentaciones" class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Presentaciones</h1>
+      <button id="new-presentacion">+ Nueva presentación</button>
+    </div>
+    <div id="alert-presentaciones"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Fecha</th><th>Lugar</th><th>Cuadros</th><th></th></tr></thead>
+          <tbody id="tbody-presentaciones"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-presentacion">
+  <div class="modal">
+    <h2 id="modal-pres-title">Nueva presentación</h2>
+    <input type="hidden" id="fi-pres-id">
+    <div class="form-group"><label>Fecha y hora</label><input type="datetime-local" id="fi-pres-fecha" required></div>
+    <div class="form-group"><label>Lugar</label><input type="text" id="fi-pres-lugar" required maxlength="250"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-presentacion')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-presentacion').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-presentacion" style="display:none"></form>
+  </div>
+</div>
+
+<!-- ===== CUADROS ===== -->
+<div id="page-cuadros" class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Cuadros</h1>
+      <button id="new-cuadro">+ Nuevo cuadro</button>
+    </div>
+    <div id="alert-cuadros"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Baile</th><th>Presentación</th><th>Parejas</th><th></th></tr></thead>
+          <tbody id="tbody-cuadros"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-cuadro">
+  <div class="modal">
+    <h2 id="modal-cuad-title">Nuevo cuadro</h2>
+    <input type="hidden" id="fi-cuad-id">
+    <div class="form-group"><label>Nombre del cuadro</label><input type="text" id="fi-cuad-nombre" required maxlength="250"></div>
+    <div class="form-group"><label>Baile</label><select id="fi-cuad-baile" required></select></div>
+    <div class="form-group"><label>Presentación (opcional)</label><select id="fi-cuad-pres"></select></div>
+    <div class="form-group"><label>Número de parejas</label><input type="number" id="fi-cuad-parejas" min="0" value="0"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-cuadro')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-cuadro').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-cuadro" style="display:none"></form>
+  </div>
+</div>
+
+<!-- ===== OBSERVACIONES ===== -->
+<div id="page-observaciones" class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Observaciones</h1>
+      <button id="new-observacion">+ Nueva observación</button>
+    </div>
+    <div id="alert-observaciones"></div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Integrante</th><th>Presentación</th><th>Ensayo</th><th>Notas</th><th></th></tr></thead>
+          <tbody id="tbody-observaciones"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-observacion">
+  <div class="modal">
+    <h2 id="modal-obs-title">Nueva observación</h2>
+    <input type="hidden" id="fi-obs-id">
+    <div class="form-group"><label>Integrante</label><select id="fi-obs-int" required></select></div>
+    <div class="form-group"><label>Presentación (texto libre)</label><input type="text" id="fi-obs-pres" maxlength="250"></div>
+    <div class="form-group"><label>Ensayo (texto libre)</label><input type="text" id="fi-obs-ens" maxlength="250"></div>
+    <div class="form-group"><label>Notas</label><textarea id="fi-obs-notas" rows="4"></textarea></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-observacion')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-observacion').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-observacion" style="display:none"></form>
+  </div>
+</div>
+
+<!-- ===== INVENTARIO ===== -->
+<div id="page-inventario" class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1>Inventario</h1>
+      <div class="actions">
+        <button id="new-item">+ Nuevo ítem</button>
+        <button id="assign-btn" class="btn-secondary">+ Asignar a presentación</button>
+      </div>
+    </div>
+    <div id="alert-inventario"></div>
+    <div class="card">
+      <h2>Ítems del inventario</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Cantidad</th><th>Color</th><th></th></tr></thead>
+          <tbody id="tbody-items"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Asignaciones por presentación</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Ítem</th><th>Presentación</th><th>Cantidad llevada</th><th>Observaciones</th><th></th></tr></thead>
+          <tbody id="tbody-asig"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-item">
+  <div class="modal">
+    <h2 id="m-item-title">Nuevo ítem</h2>
+    <input type="hidden" id="fi-item-id">
+    <div class="form-group"><label>Nombre</label><input type="text" id="fi-item-nombre" required maxlength="250"></div>
+    <div class="form-group"><label>Cantidad total</label><input type="number" id="fi-item-cant" min="0" value="0"></div>
+    <div class="form-group"><label>Color</label><input type="text" id="fi-item-color" maxlength="50"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-item')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-item').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-item" style="display:none"></form>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-asig">
+  <div class="modal">
+    <h2 id="m-asig-title">Asignar a presentación</h2>
+    <input type="hidden" id="fa-orig-item">
+    <input type="hidden" id="fa-orig-pres">
+    <div class="form-group"><label>Ítem</label><select id="fa-item" required></select></div>
+    <div class="form-group"><label>Presentación</label><select id="fa-pres" required></select></div>
+    <div class="form-group"><label>Cantidad llevada</label><input type="number" id="fa-cant" min="0" value="0"></div>
+    <div class="form-group"><label>Observaciones</label><textarea id="fa-obs" rows="2"></textarea></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal('modal-asig')">Cancelar</button>
+      <button type="button" onclick="document.getElementById('form-asig').dispatchEvent(new Event('submit'))">Guardar</button>
+    </div>
+    <form id="form-asig" style="display:none"></form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
