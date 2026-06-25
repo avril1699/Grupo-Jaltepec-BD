@@ -70,33 +70,6 @@
   <input type="text" id="f-estatura" placeholder="Ej: 1.62 m" maxlength="50" />
 </div>
         <div class="form-group">
-  <label for="f-activo">Estado</label>
-  <select id="f-activo">
-    <option value="true">Activo</option>
-    <option value="false">Inactivo</option>
-  </select>
-</div>
-
-<div class="form-group">
-  <label for="f-talla-blusa">Talla de blusa</label>
-  <input type="text" id="f-talla-blusa" maxlength="50" />
-</div>
-
-<div class="form-group">
-  <label for="f-talla-falda">Talla de falda</label>
-  <input type="text" id="f-talla-falda" maxlength="50" />
-</div>
-
-<div class="form-group">
-  <label for="f-talla-calzado">Talla de calzado</label>
-  <input type="text" id="f-talla-calzado" maxlength="50" />
-</div>
-
-<div class="form-group">
-  <label for="f-estatura">Estatura</label>
-  <input type="text" id="f-estatura" placeholder="Ej: 1.62 m" maxlength="50" />
-</div>
-        <div class="form-group">
   <label>Fotografía</label>
 
   <input
@@ -417,40 +390,64 @@ document.getElementById(
     });
     document.getElementById('cancel-btn').addEventListener('click', () => closeModal('modal'));
 
-    tbody.addEventListener('click', async (e) => {
-      const editId = e.target.dataset.edit;
-      const delId  = e.target.dataset.del;
-      if (editId) {
-        const r = window._rows.find(x => x.id == editId);
-        document.getElementById('modal-title').textContent = 'Editar integrante';
-        document.getElementById('f-id').value = r.id;
-        document.getElementById('f-nombre').value = r.nombre || '';
-        document.getElementById('f-nacimiento').value = r.fecha_nacimiento || '';
-        document.getElementById('f-ingreso').value = r.fecha_ingresso || '';
-        document.getElementById('f-obs').value = r.observaciones_medicas || '';
-        document.getElementById('f-telefono').value = r.telefono || '';
-        document.getElementById('f-correo').value = r.correo || '';
-        fotoUrl = r.foto_url || null;
+    document.addEventListener('click', async e => {
+  const row = e.target.closest('.integrante-row');
 
-const preview =
-document.getElementById(
-  'preview-foto'
-);
+  if(row){
+    mostrarPerfil(row.dataset.id);
+    return;
+  }
 
-if (fotoUrl) {
+  const editId = e.target.dataset.edit;
 
-  preview.src = fotoUrl;
-  preview.style.display = 'block';
+  if(editId){
+    const r = window._rows.find(x => x.id == editId);
 
-} else {
+    if(!puedeEditar(r)){
+      alert('No tienes permiso para editar este perfil');
+      return;
+    }
 
-  preview.style.display = 'none';
+    document.getElementById('modal-title').textContent =
+      esAdmin ? 'Editar integrante' : 'Editar mi perfil';
 
-}
-        openModal('modal');
-      }
-      if (delId) await deleteRow('integrante', delId, reload, alertC);
-    });
+    document.getElementById('f-id').value = r.id;
+    document.getElementById('f-nombre').value = r.nombre || '';
+    document.getElementById('f-nacimiento').value = r.fecha_nacimiento || '';
+    document.getElementById('f-ingreso').value = r.fecha_ingresso || '';
+    document.getElementById('f-obs').value = r.observaciones_medicas || '';
+    document.getElementById('f-telefono').value = r.telefono || '';
+    document.getElementById('f-correo').value = r.correo || '';
+    document.getElementById('f-activo').value = r.activo ? 'true' : 'false';
+    document.getElementById('f-talla-blusa').value = r.talla_blusa || '';
+    document.getElementById('f-talla-falda').value = r.talla_falda || '';
+    document.getElementById('f-talla-calzado').value = r.talla_calzado || '';
+    document.getElementById('f-estatura').value = r.estatura || '';
+
+    fotoUrl = r.foto_url || null;
+
+    const preview = document.getElementById('preview-foto');
+
+    if(fotoUrl){
+      preview.src = fotoUrl;
+      preview.style.display = 'block';
+    } else {
+      preview.style.display = 'none';
+    }
+
+    document.getElementById('f-nombre').disabled = !esAdmin;
+    document.getElementById('f-nacimiento').disabled = !esAdmin;
+    document.getElementById('f-ingreso').disabled = !esAdmin;
+    document.getElementById('f-obs').disabled = !esAdmin;
+    document.getElementById('f-activo').disabled = !esAdmin;
+    document.getElementById('f-talla-blusa').disabled = !esAdmin;
+    document.getElementById('f-talla-falda').disabled = !esAdmin;
+    document.getElementById('f-talla-calzado').disabled = !esAdmin;
+    document.getElementById('f-estatura').disabled = !esAdmin;
+
+    openModal('modal');
+  }
+});
 
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -536,6 +533,7 @@ const estatura =
   )
   RETURNING *
 `;
+      const { data, error } = await execSQL(sql);
       if (error) { showAlert(alertC, 'error', error); return; }
       const s = getSession();
       await logAudit(s.user.id, id ? 'UPDATE' : 'INSERT',
