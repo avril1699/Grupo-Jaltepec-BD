@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Eventos</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+<div class="container">
+  <div class="page-header">
+  <h1>🎪 Centro de Eventos</h1>
+
+  <button
+    id="nuevoEventoBtn"
+    style="display:none;"
+  >
+    ➕ Nuevo evento
+  </button>
+</div>
+
+  <div class="eventos-layout">
+    <div class="eventos-sidebar">
+      <div class="tabs">
+        <button id="btnProximas">🗓️ Próximas</button>
+        <button id="btnPasadas">✅ Pasadas</button>
+      </div>
+
+      <div id="listaEventos"></div>
+    </div>
+
+    <div id="detalleEvento" class="evento-detalle">
+      <h2>Selecciona una presentación</h2>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="modal-evento">
+  <div class="modal">
+    <h2>Nuevo evento</h2>
+
+    <form id="form-evento">
+
+      <div class="form-group">
+        <label>Lugar</label>
+        <input type="text" id="ev-lugar" required>
+      </div>
+
+      <div class="form-group">
+        <label>Fecha y hora</label>
+        <input type="datetime-local" id="ev-fecha" required>
+      </div>
+
+      <div class="form-group">
+        <label>Tipo de evento</label>
+        <select id="ev-tipo">
+          <option value="presentacion">Presentación</option>
+          <option value="ensayo">Ensayo</option>
+          <option value="importante">Evento importante</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Transporte</label>
+        <textarea id="ev-transporte" rows="2"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Vestuario</label>
+        <textarea id="ev-vestuario" rows="2"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Checklist inicial</label>
+        <textarea
+          id="ev-checklist"
+          rows="2"
+          placeholder="Ej: sonido, vestuario, transporte"
+        ></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Descripción</label>
+        <textarea id="ev-descripcion" rows="3"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button
+          type="button"
+          class="btn-secondary"
+          id="cancelarEvento">
+          Cancelar
+        </button>
+
+        <button type="submit">
+          Guardar evento
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+<script type="module">
+import { execSQL } from '/js/config.js';
+import { renderNavbar } from '/js/ui.js';
+import { getSession } from '/js/auth.js';
+
+renderNavbar('eventos');
+
+const session = getSession();
+const esAdmin = session?.user?.rol === 'admin';
+if(esAdmin){
+  document
+    .getElementById('nuevoEventoBtn')
+    .style.display = 'block';
+}
+const lista = document.getElementById('listaEventos');
+const detalle = document.getElementById('detalleEvento');
+
+let eventos = [];
+let mostrandoPasadas = false;
+document
+.getElementById('nuevoEventoBtn')
+.addEventListener('click', () => {
+  document.getElementById('form-evento').reset();
+  document
+    .getElementById('modal-evento')
+    .classList.add('show');
+});
+
+document
+.getElementById('cancelarEvento')
+.addEventListener('click', () => {
+  document
+    .getElementById('modal-evento')
+    .classList.remove('show');
+});
+let chartBailes = null;
+
+function esPasada(fecha){
+  return new Date(fecha) < new Date();
+}
+
+const { data } = await execSQL(`
+  SELECT *
+  FROM presentacion
+  ORDER BY fecha
+`);
+
+eventos = data || [];
+cargarLista();
+setTimeout(() => {
+  const primera =
+    document.querySelector('.evento-card');
+
+  if(primera){
+    primera.classList.add('active');
+    mostrarEvento(primera.dataset.id);
+  }
+}, 100);
+
+document.getElementById('btnProximas').onclick = () => {
+  mostrandoPasadas = false;
+  cargarLista();
+};
+
+document.getElementById('btnPasadas').onclick = () => {
+  mostrandoPasadas = true;
+  cargarLista();
+};
+
+function cargarLista(){
+  lista.innerHTML = '';
+
+  const filtrados = eventos.filter(e =>
+    mostrandoPasadas
+      ? esPasada(e.fecha)
+      : !esPasada(e.fecha)
+  );
+
+  if(filtrados.length === 0){
+    lista.innerHTML = `
+      <p class="empty">
+        No hay eventos para mostrar
+      </p>
+    `;
+    return;
+  }
+
+  filtrados.forEach(e => {
+    lista.insertAdjacentHTML(
+  'beforeend',
+  `
+  <div class="evento-card" data-id="${e.id}">
+    <h3>${e.lugar}</h3>
+    <p>📅 ${new Date(e.fecha).toLocaleString('es-MX')}</p>
+  </div>
+  `
+);
+  });
+}
+
+lista.addEventListener('click', async e => {
+  const card = e.target.closest('.evento-card');
+
+  if(!card) return;
+
+  document
+    .querySelectorAll('.evento-card')
+    .forEach(x => x.classList.remove('active'));
+
+  card.classList.add('active');
+
+  await mostrarEvento(card.dataset.id);
+});
+
+async function mostrarEvento(id){
+  const { data } = await execSQL(`
+    SELECT *
+    FROM presentacion
+    WHERE id=${id}
+  `);
+
+  const evento = data[0];
+  const pasada = esPasada(evento.fecha);
+
+  detalle.innerHTML = `
+    <h2>
+      ${pasada ? '✅ Evento Finalizado' : '🎭 Evento Próximo'}
+    </h2>
+
+    <p><strong>📍 Lugar:</strong> ${evento.lugar}</p>
+    <p><strong>📅 Fecha:</strong> ${new Date(evento.fecha).toLocaleString('es-MX')}</p>
+
+    <div class="card">
+      <h3>📊 Bailes más presentados</h3>
+      <canvas id="chartBailesEventos"></canvas>
+    </div>
+
+    <div class="card">
+      <h3>✅ Checklist del evento</h3>
+<div class="progress-container">
+  <div id="checkEventoBar" class="progress-bar"></div>
+</div>
+
+      <p id="checkEventoTexto">
+        0 / 0 tareas completadas
+      </p>
+
+      ${
+        esAdmin
+        ? `
+        <div class="tarea-form">
+          <input
+            type="text"
+            id="nuevaTareaEvento"
+            placeholder="Nueva tarea..."
+          >
+
+          <button id="agregarTareaEvento" data-id="${evento.id}">
+            ➕ Agregar
+          </button>
+        </div>
+        `
+        : ''
+      }
+
+      <div id="listaTareasEvento"></div>
+    </div>
+
+    ${
+  !pasada
+    ? `
+    
+    `
+    : `
+      <div class="card">
+        <h3>📝 Evaluación Post-Show</h3>
+        <div id="integrantesGrid"></div>
+      </div>
+    `
+}
+  `;
+
+  await cargarGraficaBailes();
+  await cargarChecklistEvento(evento.id);
+
+  if(pasada){
+    await cargarIntegrantesEvaluacion(evento.id);
+  }
+}
+
+async function cargarGraficaBailes(){
+  const { data } = await execSQL(`
+    SELECT
+      b.nombre,
+      COUNT(*) AS total
+    FROM cuadro c
+    JOIN baile b
+    ON b.id = c.id_baile
+    WHERE c.id_presentation IS NOT NULL
+    GROUP BY b.nombre
+    ORDER BY total DESC
+    LIMIT 8
+  `);
+
+  const canvas = document.getElementById('chartBailesEventos');
+  if(!canvas) return;
+
+  if(chartBailes){
+    chartBailes.destroy();
+  }
+
+  chartBailes = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: data.map(x => x.nombre),
+      datasets: [{
+        label: 'Veces presentado',
+        data: data.map(x => x.total)
+      }]
+    }
+  });
+}
+
+async function cargarChecklistEvento(idPresentacion){
+  const { data } = await execSQL(`
+    SELECT *
+    FROM checklist_evento
+    WHERE id_presentacion=${idPresentacion}
+    ORDER BY id
+  `);
+
+  const lista = document.getElementById('listaTareasEvento');
+  if(!lista) return;
+
+  lista.innerHTML = '';
+
+  data.forEach(t => {
+    lista.insertAdjacentHTML(
+      'beforeend',
+      `
+      <div class="tarea-item ${t.completada ? 'tarea-hecha' : ''}">
+        <label>
+          <input
+            type="checkbox"
+            class="check-evento"
+            data-id="${t.id}"
+            ${t.completada ? 'checked' : ''}
+            ${esAdmin ? '' : 'disabled'}
+          >
+          ${t.tarea}
+        </label>
+      </div>
+      `
+    );
+  });
+
+  actualizarProgresoEvento(data);
+}
+
+function actualizarProgresoEvento(tareas){
+  const total = tareas.length;
+  const hechas = tareas.filter(t => t.completada).length;
+  const porcentaje = total ? (hechas / total) * 100 : 0;
+
+  document.getElementById('checkEventoBar').style.width =
+    porcentaje + '%';
+
+  document.getElementById('checkEventoTexto').textContent =
+    `${hechas} / ${total} tareas completadas`;
+}
+
+async function cargarIntegrantesEvaluacion(idEvento){
+  const integrantes = await execSQL(`
+    SELECT *
+    FROM integrante
+    ORDER BY nombre
+  `);
+
+  const grid = document.getElementById('integrantesGrid');
+  if(!grid) return;
+
+  integrantes.data.forEach(i => {
+    grid.insertAdjacentHTML(
+      'beforeend',
+      `
+      <div
+        class="integrante-chip"
+        data-id="${i.id}"
+        data-evento="${idEvento}"
+      >
+        ${i.nombre}
+      </div>
+      `
+    );
+  });
+}
+
+document.addEventListener('click', async e => {
+  if(e.target.id === 'agregarTareaEvento'){
+    if(!esAdmin) return;
+
+    const input = document.getElementById('nuevaTareaEvento');
+    const tarea = input.value.trim();
+    const idPresentacion = e.target.dataset.id;
+
+    if(!tarea){
+      alert('Escribe una tarea');
+      return;
+    }
+
+    await execSQL(`
+      INSERT INTO checklist_evento(
+        id_presentacion,
+        tarea
+      )
+      VALUES(
+        ${idPresentacion},
+        '${tarea.replace(/'/g,"''")}'
+      )
+    `);
+
+    input.value = '';
+    await cargarChecklistEvento(idPresentacion);
+  }
+
+  if(e.target.classList.contains('integrante-chip')){
+    const idIntegrante = e.target.dataset.id;
+    const idEvento = e.target.dataset.evento;
+
+    const obs = prompt('Observación');
+    if(obs === null) return;
+
+    const cal = prompt('Calificación (1-5)');
+    if(cal === null) return;
+
+    await execSQL(`
+      INSERT INTO evaluacion_presentacion(
+        id_presentacion,
+        id_integrante,
+        observacion,
+        calificacion
+      )
+      VALUES(
+        ${idEvento},
+        ${idIntegrante},
+        '${obs.replace(/'/g,"''")}',
+        ${cal}
+      )
+    `);
+
+    alert('Evaluación guardada');
+  }
+});
+
+document.addEventListener('change', async e => {
+  if(e.target.classList.contains('check-evento')){
+    if(!esAdmin){
+      e.target.checked = !e.target.checked;
+      return;
+    }
+
+    await execSQL(`
+      UPDATE checklist_evento
+      SET completada=${e.target.checked}
+      WHERE id=${e.target.dataset.id}
+    `);
+
+    const eventoActivo =
+      document.querySelector('.evento-card.active');
+
+    if(eventoActivo){
+      await cargarChecklistEvento(eventoActivo.dataset.id);
+    }
+  }
+});
+document
+.getElementById('form-evento')
+.addEventListener('submit', async e => {
+  e.preventDefault();
+
+  if(!esAdmin){
+    alert('Solo el administrador puede agregar eventos');
+    return;
+  }
+
+  const lugar =
+    document.getElementById('ev-lugar').value.trim();
+
+  const fecha =
+    document.getElementById('ev-fecha').value;
+
+  const tipo =
+    document.getElementById('ev-tipo').value;
+
+  const transporte =
+    document.getElementById('ev-transporte').value.trim();
+
+  const vestuario =
+    document.getElementById('ev-vestuario').value.trim();
+
+  const checklist =
+    document.getElementById('ev-checklist').value.trim();
+
+  const descripcion =
+    document.getElementById('ev-descripcion').value.trim();
+
+  if(!lugar || !fecha){
+    alert('Completa lugar y fecha');
+    return;
+  }
+
+  const { error } =
+  await execSQL(`
+    INSERT INTO presentacion(
+      lugar,
+      fecha,
+      tipo_evento,
+      transporte,
+      vestuario,
+      checklist,
+      descripcion
+    )
+    VALUES(
+      '${lugar.replace(/'/g,"''")}',
+      '${fecha}',
+      '${tipo}',
+      '${transporte.replace(/'/g,"''")}',
+      '${vestuario.replace(/'/g,"''")}',
+      '${checklist.replace(/'/g,"''")}',
+      '${descripcion.replace(/'/g,"''")}'
+    )
+  `);
+
+  if(error){
+    alert(error);
+    return;
+  }
+
+  document
+    .getElementById('modal-evento')
+    .classList.remove('show');
+
+  alert('Evento creado');
+
+  location.reload();
+});
+</script>
+</body>
+</html>

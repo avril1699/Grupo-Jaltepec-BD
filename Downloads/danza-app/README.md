@@ -25,7 +25,6 @@ danza-app/
 │   ├── dashboard.html
 │   ├── integrantes.html
 │   ├── bailes.html
-│   ├── participaciones.html
 │   ├── presentaciones.html
 │   ├── cuadros.html
 │   ├── observaciones.html

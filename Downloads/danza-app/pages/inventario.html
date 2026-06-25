@@ -13,31 +13,89 @@
       <div class="actions">
         <button id="new-btn">+ Nuevo ítem</button>
         <button id="assign-btn" class="btn-secondary">+ Asignar a presentación</button>
+        <div class="tabs" style="margin-bottom:12px;">
+  
       </div>
     </div>
     <div id="alert-container"></div>
-    <div class="card">
-      <h2>Ítems del inventario</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>ID</th><th>Nombre</th><th>Cantidad</th><th>Color</th><th></th></tr></thead>
-          <tbody id="tbody-items"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Asignaciones por presentación</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Ítem</th><th>Presentación</th><th>Cantidad llevada</th><th>Observaciones</th><th></th></tr>
-          </thead>
-          <tbody id="tbody-asig"></tbody>
-        </table>
-      </div>
+    <div class="inventario-layout">
+
+  <div class="card inventario-columna">
+    <h2>📦 Ítems del inventario</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Cantidad</th>
+            <th>Color</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody id="tbody-items"></tbody>
+      </table>
     </div>
   </div>
-  <div class="modal-backdrop" id="modal-item">
+
+  <div class="card inventario-columna">
+    <h2>🧳 Asignaciones por presentación</h2>
+
+    <div class="progress-card">
+      <h3 id="progreso-texto">
+        Carga de utilería: 0%
+      </h3>
+
+      <div class="progress">
+        <div
+          id="progreso-bar"
+          class="progress-bar">
+        </div>
+      </div>
+    </div>
+<div
+  class="tabs"
+  style="
+    margin:15px 0;
+    display:flex;
+    gap:10px;
+  "
+>
+  <button
+    id="btnAsigFuturas"
+    class="active"
+  >
+    🗓 Futuras
+  </button>
+
+  <button
+    id="btnAsigPasadas"
+  >
+    📦 Pasadas
+  </button>
+</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>✓</th>
+            <th>Ítem</th>
+            <th>Presentación</th>
+            <th>Cantidad</th>
+            <th>Observaciones</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody id="tbody-asig"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<div class="modal-backdrop" id="modal-item">
     <div class="modal">
       <h2 id="m-item-title">Nuevo ítem</h2>
       <form id="form-item">
@@ -84,13 +142,17 @@
 
     if (!requireAuth()) throw new Error('redirect');
 
-renderNavbar('presentaciones');
+renderNavbar('inventario');
 
 const session = getSession();
 
 const esAdmin =
-  session?.user?.rol === 'usuario' ||
   session?.user?.rol === 'admin';
+
+document.body.classList.toggle(
+  'solo-lectura',
+  !esAdmin
+);
 
 document.getElementById('main').style.display = 'block';
 
@@ -104,6 +166,7 @@ if (!esAdmin) {
     const tbItems = document.getElementById('tbody-items');
     const tbAsig  = document.getElementById('tbody-asig');
     const alertC  = document.getElementById('alert-container');
+    let mostrarAsignacionesPasadas = false;
 
     async function loadDropdowns() {
       const { data: items } = await execSQL('SELECT id, nombre FROM inventario ORDER BY nombre');
@@ -126,15 +189,60 @@ if (!esAdmin) {
           <tr>
             <td>${r.id}</td>
             <td>${r.nombre}</td>
-            <td>${r.cantidad_total}</td>
-            <td>${r.color || '—'}</td>
             <td>
+
+<div class="stock-bar">
+
+<div
+style="
+width:${Math.min(r.cantidad_total*5,100)}%;
+background:
+${
+r.cantidad_total < 5
+? 'red'
+: r.cantidad_total < 10
+? 'orange'
+: 'green'
+};
+height:12px;
+border-radius:20px;
+">
+</div>
+
+</div>
+
+${r.cantidad_total}
+
+</td>
+            <td>
+
+<span
+class="color-dot"
+style="
+background:${r.color || '#999'};
+">
+</span>
+
+${r.color || '—'}
+
+</td>
+            <td>
+<td>
 ${
   esAdmin
     ? `
     <div class="actions">
-      <button class="btn-secondary btn-sm" data-edit-asig="1">Editar</button>
-      <button class="btn-danger btn-sm" data-del-asig="1">Borrar</button>
+      <button
+        class="btn-secondary btn-sm"
+        data-edit-item="${r.id}">
+        Editar
+      </button>
+
+      <button
+        class="btn-danger btn-sm"
+        data-del-item="${r.id}">
+        Borrar
+      </button>
     </div>
     `
     : ''
@@ -146,37 +254,172 @@ ${
     }
 
     async function reloadAsig() {
-      const rows = await loadRows(`
-        SELECT ip.*, i.nombre AS item_nombre,
-               p.fecha AS pres_fecha, p.lugar AS pres_lugar
-          FROM inventario_presentacion ip
-          JOIN inventario i ON i.id = ip.id_item
-          JOIN presentacion p ON p.id = ip.id_presentation
-         ORDER BY p.fecha DESC, i.nombre
-      `, tbAsig, r => `
-        <tr data-item="${r.id_item}" data-pres="${r.id_presentation}">
-          <td>${r.item_nombre}</td>
-          <td>${formatDateTime(r.pres_fecha)} · ${r.pres_lugar}</td>
-          <td>${r.cantidad_llevada}</td>
-          <td>${r.observaciones || '—'}</td>
-          <td>
-<td>
-${
-  esAdmin
-    ? `
-    <div class="actions">
-      <button class="btn-secondary btn-sm" data-edit-item="${r.id}">Editar</button>
-      <button class="btn-danger btn-sm" data-del-item="${r.id}">Borrar</button>
-    </div>
-    `
-    : ''
-}
-</td>
-        </tr>
-      `);
-      window._asig = rows;
-    }
 
+const filtroFecha =
+  mostrarAsignacionesPasadas
+    ? 'p.fecha < NOW()'
+    : 'p.fecha >= NOW()';
+
+const { data } = await execSQL(`
+SELECT
+  ip.*,
+  i.nombre item_nombre,
+  i.cantidad_total,
+  i.color,
+  p.fecha pres_fecha,
+  p.lugar pres_lugar
+FROM inventario_presentacion ip
+JOIN inventario i
+ON i.id=ip.id_item
+JOIN presentacion p
+ON p.id=ip.id_presentation
+WHERE ${
+mostrarAsignacionesPasadas
+? "p.fecha < NOW()"
+: "p.fecha >= NOW()"
+}
+
+ORDER BY p.fecha ASC
+`);
+
+
+tbAsig.innerHTML='';
+
+let empacados=0;
+
+data.forEach(r=>{
+
+if(r.empacado)
+empacados++;
+
+const porcentaje =
+Math.min(
+(r.cantidad_total/20)*100,
+100
+);
+
+let colorBar='green';
+
+if(r.cantidad_total<5)
+colorBar='red';
+else if(r.cantidad_total<10)
+colorBar='orange';
+
+tbAsig.insertAdjacentHTML(
+'beforeend',
+`
+<tr
+data-item="${r.id_item}"
+data-pres="${r.id_presentation}"
+class="${r.empacado ? 'empacado' : ''}">
+<td>
+
+<input
+type="checkbox"
+class="chkEmpacado"
+data-item="${r.id_item}"
+data-pres="${r.id_presentation}"
+${r.empacado?'checked':''}
+>
+</td>
+
+<td>
+
+<span
+class="color-dot"
+style="
+background:${r.color||'#999'}
+">
+</span>
+
+${r.item_nombre}
+
+</td>
+
+<td>
+${formatDateTime(r.pres_fecha)}
+<br>
+${r.pres_lugar}
+</td>
+
+<td>
+
+<div class="stock-bar">
+
+<div
+style="
+width:${porcentaje}%;
+background:${colorBar};
+height:10px;
+border-radius:20px;
+">
+</div>
+
+</div>
+
+${r.cantidad_llevada}
+
+</td>
+
+<td>
+${r.observaciones||''}
+</td>
+
+<td>
+
+${
+esAdmin
+? `
+<button
+class="btn-secondary btn-sm"
+data-edit-asig="1">
+Editar
+</button>
+
+<button
+class="btn-danger btn-sm"
+data-del-asig="1">
+Borrar
+</button>
+`
+: ''
+}
+
+</td>
+
+</tr>
+`
+);
+
+});
+
+const total =
+data.length;
+
+const avance =
+total
+? Math.round(
+(empacados/total)*100
+)
+: 0;
+
+document.getElementById(
+'progreso-texto'
+).textContent =
+`Carga de utilería:
+${empacados}
+de
+${total}
+(${avance}%)`;
+
+document.getElementById(
+'progreso-bar'
+).style.width =
+avance+'%';
+
+window._asig = data;
+
+}
     document.getElementById('new-btn').addEventListener('click', () => {
       document.getElementById('m-item-title').textContent = 'Nuevo ítem';
       document.getElementById('form-item').reset();
@@ -197,19 +440,30 @@ ${
     document.getElementById('cancel-asig').addEventListener('click', () => closeModal('modal-asig'));
 
     tbItems.addEventListener('click', async (e) => {
-      const editId = e.target.dataset.editItem;
-      const delId  = e.target.dataset.delItem;
-      if (editId) {
-        const r = window._items.find(x => x.id == editId);
-        document.getElementById('m-item-title').textContent = 'Editar ítem';
-        document.getElementById('fi-id').value = r.id;
-        document.getElementById('fi-nombre').value = r.nombre || '';
-        document.getElementById('fi-cantidad').value = r.cantidad_total || 0;
-        document.getElementById('fi-color').value = r.color || '';
-        openModal('modal-item');
-      }
-      if (delId) await deleteRow('inventario', delId, reloadItems, alertC);
-    });
+  const editId = e.target.dataset.editItem;
+
+
+  if(!editId && !delId) return;
+
+  if(!esAdmin){
+    alert('Solo el administrador puede modificar inventario');
+    return;
+  }
+
+  if (editId) {
+    const r = window._items.find(x => x.id == editId);
+    document.getElementById('m-item-title').textContent = 'Editar ítem';
+    document.getElementById('fi-id').value = r.id;
+    document.getElementById('fi-nombre').value = r.nombre || '';
+    document.getElementById('fi-cantidad').value = r.cantidad_total || 0;
+    document.getElementById('fi-color').value = r.color || '';
+    openModal('modal-item');
+  }
+
+  if (delId) {
+    await deleteRow('inventario', delId, reloadItems, alertC);
+  }
+});
 
     tbAsig.addEventListener('click', async (e) => {
       const tr = e.target.closest('tr');
@@ -234,9 +488,25 @@ ${
           `id_item=${esc(idItem)} AND id_presentation=${esc(idPres)}`, reloadAsig, alertC);
       }
     });
+    tbAsig.addEventListener('change', async e => {
+  if(!e.target.classList.contains('chkEmpacado')) return;
+
+  await execSQL(`
+    UPDATE inventario_presentacion
+    SET empacado=${e.target.checked}
+    WHERE id_item=${e.target.dataset.item}
+    AND id_presentation=${e.target.dataset.pres}
+  `);
+
+  await reloadAsig();
+});
 
     document.getElementById('form-item').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if(!esAdmin){
+  alert('Solo el administrador puede guardar inventario');
+  return;
+}
       const id     = document.getElementById('fi-id').value;
       const nombre = document.getElementById('fi-nombre').value.trim();
       const cant   = parseInt(document.getElementById('fi-cantidad').value) || 0;
@@ -257,8 +527,41 @@ ${
       showAlert(alertC, 'success', id ? 'Ítem actualizado' : 'Ítem creado');
       closeModal('modal-item');
       await reloadItems();
+      
+reloadAsig();
+document
+.getElementById('btnAsigFuturas')
+.addEventListener('click', async () => {
+  mostrarAsignacionesPasadas = false;
+
+  document
+    .getElementById('btnAsigFuturas')
+    .classList.add('active');
+
+  document
+    .getElementById('btnAsigPasadas')
+    .classList.remove('active');
+
+  await reloadAsig();
+});
+
+document
+.getElementById('btnAsigPasadas')
+.addEventListener('click', async () => {
+  mostrarAsignacionesPasadas = true;
+
+  document
+    .getElementById('btnAsigPasadas')
+    .classList.add('active');
+
+  document
+    .getElementById('btnAsigFuturas')
+    .classList.remove('active');
+
+  await reloadAsig();
+});
+});
       await loadDropdowns();
-    });
 
     document.getElementById('form-asig').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -285,7 +588,44 @@ ${
       closeModal('modal-asig');
       await reloadAsig();
     });
+document
+  .getElementById('btnAsigFuturas')
+  .classList.add('active');
+  document
+.getElementById('btnAsigFuturas')
+.onclick = async () => {
 
+  mostrarAsignacionesPasadas = false;
+
+  document
+  .getElementById('btnAsigFuturas')
+  .classList.add('active');
+
+  document
+  .getElementById('btnAsigPasadas')
+  .classList.remove('active');
+
+  await reloadAsig();
+
+};
+
+document
+.getElementById('btnAsigPasadas')
+.onclick = async () => {
+
+  mostrarAsignacionesPasadas = true;
+
+  document
+  .getElementById('btnAsigPasadas')
+  .classList.add('active');
+
+  document
+  .getElementById('btnAsigFuturas')
+  .classList.remove('active');
+
+  await reloadAsig();
+
+};
     await loadDropdowns();
     await reloadItems();
     await reloadAsig();

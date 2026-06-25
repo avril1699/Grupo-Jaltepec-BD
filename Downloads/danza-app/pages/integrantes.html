@@ -9,21 +9,20 @@
 <body>
   <div class="container" id="main" style="display: none;">
     <div class="page-header">
+      <div class="kpi-grid" id="kpis-integrantes"></div>
       <h1>Integrantes</h1>
       <button id="new-btn">+ Nuevo integrante</button>
     </div>
     <div id="alert-container"></div>
-    <div class="card">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>ID</th><th>Nombre</th><th>Nacimiento</th><th>Ingreso</th><th>Obs. médicas</th><th></th></tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="integrantes-layout">
+  <div class="card integrantes-list" id="tbody"></div>
+
+  <div class="card integrante-profile" id="perfilIntegrante">
+    <h2>Selecciona un integrante</h2>
+    <p>Da clic en un nombre para ver su perfil completo.</p>
   </div>
+</div>
+</div>
   <div class="modal-backdrop" id="modal">
     <div class="modal">
       <h2 id="modal-title">Nuevo integrante</h2>
@@ -35,6 +34,89 @@
           <input type="date" id="f-nacimiento" /></div>
         <div class="form-group"><label for="f-ingreso">Fecha de ingreso</label>
           <input type="date" id="f-ingreso" /></div>
+        <div class="form-group">
+         <label for="f-telefono">Teléfono</label>
+          <input type="text" id="f-telefono" maxlength="20" />
+        </div>
+        <div class="form-group">
+        <label for="f-correo">Correo electrónico</label>
+          <input type="email" id="f-correo" />
+        </div>
+        <div class="form-group">
+  <label for="f-activo">Estado</label>
+  <select id="f-activo">
+    <option value="true">Activo</option>
+    <option value="false">Inactivo</option>
+  </select>
+</div>
+
+<div class="form-group">
+  <label for="f-talla-blusa">Talla de blusa</label>
+  <input type="text" id="f-talla-blusa" maxlength="50" />
+</div>
+
+<div class="form-group">
+  <label for="f-talla-falda">Talla de falda</label>
+  <input type="text" id="f-talla-falda" maxlength="50" />
+</div>
+
+<div class="form-group">
+  <label for="f-talla-calzado">Talla de calzado</label>
+  <input type="text" id="f-talla-calzado" maxlength="50" />
+</div>
+
+<div class="form-group">
+  <label for="f-estatura">Estatura</label>
+  <input type="text" id="f-estatura" placeholder="Ej: 1.62 m" maxlength="50" />
+</div>
+        <div class="form-group">
+  <label for="f-activo">Estado</label>
+  <select id="f-activo">
+    <option value="true">Activo</option>
+    <option value="false">Inactivo</option>
+  </select>
+</div>
+
+<div class="form-group">
+  <label for="f-talla-blusa">Talla de blusa</label>
+  <input type="text" id="f-talla-blusa" maxlength="50" />
+</div>
+
+<div class="form-group">
+  <label for="f-talla-falda">Talla de falda</label>
+  <input type="text" id="f-talla-falda" maxlength="50" />
+</div>
+
+<div class="form-group">
+  <label for="f-talla-calzado">Talla de calzado</label>
+  <input type="text" id="f-talla-calzado" maxlength="50" />
+</div>
+
+<div class="form-group">
+  <label for="f-estatura">Estatura</label>
+  <input type="text" id="f-estatura" placeholder="Ej: 1.62 m" maxlength="50" />
+</div>
+        <div class="form-group">
+  <label>Fotografía</label>
+
+  <input
+    type="file"
+    id="f-foto"
+    accept="image/*"
+  >
+
+  <img
+    id="preview-foto"
+    style="
+      width:120px;
+      height:120px;
+      border-radius:50%;
+      object-fit:cover;
+      margin-top:10px;
+      display:none;
+    "
+  >
+</div>
         <div class="form-group"><label for="f-obs">Observaciones médicas</label>
           <textarea id="f-obs" rows="3"></textarea></div>
         <div class="modal-actions">
@@ -49,50 +131,287 @@
     import { execSQL } from '/js/config.js';
     import { renderNavbar, formatDate, showAlert, openModal, closeModal } from '/js/ui.js';
     import { loadRows, deleteRow, esc } from '/js/crud.js';
+    import { supabase }
+    from '/js/storage.js';
 
     if (!requireAuth()) throw new Error('redirect');
     renderNavbar('integrantes');
     document.getElementById('main').style.display = 'block';
 
+    document
+.getElementById('f-foto')
+.addEventListener(
+  'change',
+  async e => {
+
+    const file =
+      e.target.files[0];
+
+    if (!file) return;
+
+    try {
+
+      const preview =
+        document.getElementById(
+          'preview-foto'
+        );
+
+      preview.src =
+        URL.createObjectURL(file);
+
+      preview.style.display =
+        'block';
+
+      const nombreArchivo =
+        Date.now() +
+        '_' +
+        file.name.replaceAll(
+          ' ',
+          '_'
+        );
+
+      const { error } =
+        await supabase.storage
+          .from(
+            'fotos-integrantes'
+          )
+          .upload(
+            nombreArchivo,
+            file,
+            {
+              upsert: true
+            }
+          );
+
+      if (error) {
+        alert(
+          'Error al subir la foto'
+        );
+        console.error(error);
+        return;
+      }
+
+      const { data } =
+        supabase.storage
+          .from(
+            'fotos-integrantes'
+          )
+          .getPublicUrl(
+            nombreArchivo
+          );
+
+      fotoUrl =
+        data.publicUrl;
+
+      console.log(
+        'Foto subida:',
+        fotoUrl
+      );
+
+    } catch(err) {
+
+      console.error(err);
+
+      alert(
+        'No se pudo subir la foto'
+      );
+
+    }
+
+  }
+);
+
     const tbody = document.getElementById('tbody');
     const alertC = document.getElementById('alert-container');
     const session = getSession();
     const esAdmin = session?.user?.rol === 'admin';
+   let fotoUrl = null;
+
+const esPropio = id =>
+  session?.user?.id_integrante == id;
+
+const puedeEditar = r =>
+  esAdmin || esPropio(r.id);
+
+const kpis =
+  document.getElementById('kpis-integrantes');
+
+async function cargarKPIs(){
+  const total = await execSQL(`
+    SELECT COUNT(*) AS total
+    FROM integrante
+  `);
+
+  const activos = await execSQL(`
+    SELECT COUNT(*) AS total
+    FROM integrante
+    WHERE activo = true
+  `);
+
+  const inactivos = await execSQL(`
+    SELECT COUNT(*) AS total
+    FROM integrante
+    WHERE activo = false
+  `);
+
+  kpis.innerHTML = `
+    <div class="stat-card">
+      <div class="label">👥 Total integrantes</div>
+      <div class="value">${total.data[0].total}</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="label">✅ Activos</div>
+      <div class="value">${activos.data[0].total}</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="label">⛔ Inactivos</div>
+      <div class="value">${inactivos.data[0].total}</div>
+    </div>
+  `;
+}
+    if (!esAdmin) {
+  document.getElementById('new-btn').style.display = 'none';
+}
+
+function calcularAntiguedad(fecha){
+
+  if(!fecha) return 'Sin registro';
+
+  const inicio = new Date(fecha);
+  const hoy = new Date();
+
+  let años =
+    hoy.getFullYear() -
+    inicio.getFullYear();
+
+  let meses =
+    hoy.getMonth() -
+    inicio.getMonth();
+
+  if(meses < 0){
+    años--;
+    meses += 12;
+  }
+
+  return `${años} años ${meses} meses`;
+}
 
     async function reload() {
       const rows = await loadRows(
         'SELECT * FROM integrante ORDER BY id ASC', tbody,
-        r => `
-          <tr>
-            <td>${r.id}</td>
-            <td>${r.nombre}</td>
-            <td>${formatDate(r.fecha_nacimiento)}</td>
-            <td>${formatDate(r.fecha_ingresso)}</td>
-            <td>${r.observaciones_medicas ? r.observaciones_medicas.slice(0, 60) + (r.observaciones_medicas.length > 60 ? '…' : '') : '—'}</td>
-            <td>
-  ${
-    esAdmin ||
-    (
-      session?.user?.rol === 'integrante' &&
-      session?.user?.id_integrante == r.id
-    )
-      ? `
-      <div class="actions">
-        <button class="btn-secondary btn-sm" data-edit="${r.id}">Editar</button>
-        <button class="btn-danger btn-sm" data-del="${r.id}">Borrar</button>
-      </div>
-      `
-      : ''
-  }
-</td>
-          </tr>
-        `);
-      window._rows = rows;
-    }
+        r => {
 
+const antiguedad = calcularAntiguedad(
+  r.fecha_ingresso
+);
+
+const badge =
+  r.observaciones_medicas
+  ? `
+    <span class="badge-warning">
+      ⚠ Restricción médica
+    </span>
+  `
+  : `
+    <span class="badge-ok">
+      ✓ Sin restricciones
+    </span>
+  `;
+
+return `
+<div
+  class="integrante-row"
+  data-id="${r.id}"
+>
+  <img
+    src="${r.foto_url || '/Imagen/avatar.png'}"
+    alt="${r.nombre}"
+  >
+
+  <div class="integrante-row-info">
+    <strong>${r.nombre}</strong>
+    <small>
+      ${r.activo ? '🟢 Activo' : '🔴 Inactivo'} ·
+      ${r.telefono || 'Sin teléfono'}
+    </small>
+  </div>
+</div>
+`;
+});
+      window._rows = rows;
+      if(rows.length > 0){
+  mostrarPerfil(rows[0].id);
+}
+    }
+function mostrarPerfil(id){
+
+  const r =
+    window._rows.find(
+      x => x.id == id
+    );
+
+  if(!r) return;
+
+  const antiguedad =
+    calcularAntiguedad(
+      r.fecha_ingresso
+    );
+
+  document.getElementById(
+    'perfilIntegrante'
+  ).innerHTML = `
+    <div class="perfil-header">
+      <img
+        src="${r.foto_url || '/Imagen/avatar.png'}"
+        alt="${r.nombre}"
+      >
+
+      <div>
+        <h2>${r.nombre}</h2>
+        <span class="${r.activo ? 'badge-success' : 'badge-danger'}">
+          ${r.activo ? 'Activo' : 'Inactivo'}
+        </span>
+      </div>
+    </div>
+
+    <div class="perfil-grid">
+      <p><strong>🎂 Nacimiento:</strong> ${formatDate(r.fecha_nacimiento)}</p>
+      <p><strong>📅 Ingreso:</strong> ${formatDate(r.fecha_ingresso)}</p>
+      <p><strong>⭐ Antigüedad:</strong> ${antiguedad}</p>
+      <p><strong>📞 Teléfono:</strong> ${r.telefono || 'No registrado'}</p>
+      <p><strong>📧 Correo:</strong> ${r.correo || 'No registrado'}</p>
+      <p><strong>👚 Blusa:</strong> ${r.talla_blusa || 'No registrada'}</p>
+      <p><strong>💃 Falda:</strong> ${r.talla_falda || 'No registrada'}</p>
+      <p><strong>👟 Calzado:</strong> ${r.talla_calzado || 'No registrado'}</p>
+      <p><strong>📏 Estatura:</strong> ${r.estatura || 'No registrada'}</p>
+    </div>
+
+    <h3>🩺 Observaciones médicas</h3>
+    <p>${r.observaciones_medicas || 'Ninguna'}</p>
+
+    ${
+  puedeEditar(r)
+  ? `
+  <div class="actions">
+    <button class="btn-secondary" data-edit="${r.id}">
+      ✏️ Editar perfil
+    </button>
+  </div>
+  `
+  : ''
+}
+  `;
+}
     document.getElementById('new-btn').addEventListener('click', () => {
       document.getElementById('modal-title').textContent = 'Nuevo integrante';
       document.getElementById('form').reset();
+      fotoUrl = null;
+
+document.getElementById(
+  'preview-foto'
+).style.display = 'none';
       document.getElementById('f-id').value = '';
       openModal('modal');
     });
@@ -109,6 +428,25 @@
         document.getElementById('f-nacimiento').value = r.fecha_nacimiento || '';
         document.getElementById('f-ingreso').value = r.fecha_ingresso || '';
         document.getElementById('f-obs').value = r.observaciones_medicas || '';
+        document.getElementById('f-telefono').value = r.telefono || '';
+        document.getElementById('f-correo').value = r.correo || '';
+        fotoUrl = r.foto_url || null;
+
+const preview =
+document.getElementById(
+  'preview-foto'
+);
+
+if (fotoUrl) {
+
+  preview.src = fotoUrl;
+  preview.style.display = 'block';
+
+} else {
+
+  preview.style.display = 'none';
+
+}
         openModal('modal');
       }
       if (delId) await deleteRow('integrante', delId, reload, alertC);
@@ -121,25 +459,94 @@
       const nac = document.getElementById('f-nacimiento').value || null;
       const ing = document.getElementById('f-ingreso').value || null;
       const obs = document.getElementById('f-obs').value.trim() || null;
+      const telefono = document.getElementById('f-telefono').value.trim() || null;
+      const correo = document.getElementById('f-correo').value.trim() || null;
+      const foto = fotoUrl;
+      const activo =
+  document.getElementById('f-activo').value === 'true';
 
+const tallaBlusa =
+  document.getElementById('f-talla-blusa').value.trim() || null;
+
+const tallaFalda =
+  document.getElementById('f-talla-falda').value.trim() || null;
+
+const tallaCalzado =
+  document.getElementById('f-talla-calzado').value.trim() || null;
+
+const estatura =
+  document.getElementById('f-estatura').value.trim() || null;
       const sql = id
-        ? `UPDATE integrante SET nombre=${esc(nombre)}, fecha_nacimiento=${esc(nac)},
-                  fecha_ingresso=${esc(ing)}, observaciones_medicas=${esc(obs)}
-            WHERE id=${esc(id)} RETURNING *`
-        : `INSERT INTO integrante (nombre, fecha_nacimiento, fecha_ingresso, observaciones_medicas)
-            VALUES (${esc(nombre)}, ${esc(nac)}, ${esc(ing)}, ${esc(obs)}) RETURNING *`;
-
-      const { data, error } = await execSQL(sql);
+? (
+  esAdmin
+  ? `
+    UPDATE integrante SET
+      nombre=${esc(nombre)},
+      fecha_nacimiento=${esc(nac)},
+      fecha_ingresso=${esc(ing)},
+      observaciones_medicas=${esc(obs)},
+      telefono=${esc(telefono)},
+      correo=${esc(correo)},
+      foto_url=${esc(foto)},
+      activo=${activo},
+      talla_blusa=${esc(tallaBlusa)},
+      talla_falda=${esc(tallaFalda)},
+      talla_calzado=${esc(tallaCalzado)},
+      estatura=${esc(estatura)}
+    WHERE id=${esc(id)}
+    RETURNING *
+  `
+  : `
+    UPDATE integrante SET
+      telefono=${esc(telefono)},
+      correo=${esc(correo)},
+      foto_url=${esc(foto)}
+    WHERE id=${esc(session.user.id_integrante)}
+    RETURNING *
+  `
+)
+: `
+  INSERT INTO integrante (
+    nombre,
+    fecha_nacimiento,
+    fecha_ingresso,
+    observaciones_medicas,
+    telefono,
+    correo,
+    foto_url,
+    activo,
+    talla_blusa,
+    talla_falda,
+    talla_calzado,
+    estatura
+  )
+  VALUES (
+    ${esc(nombre)},
+    ${esc(nac)},
+    ${esc(ing)},
+    ${esc(obs)},
+    ${esc(telefono)},
+    ${esc(correo)},
+    ${esc(foto)},
+    ${activo},
+    ${esc(tallaBlusa)},
+    ${esc(tallaFalda)},
+    ${esc(tallaCalzado)},
+    ${esc(estatura)}
+  )
+  RETURNING *
+`;
       if (error) { showAlert(alertC, 'error', error); return; }
       const s = getSession();
       await logAudit(s.user.id, id ? 'UPDATE' : 'INSERT',
         { nombre, fecha_ingresso: ing }, 'integrante', data && data[0] ? data[0].id : null);
       showAlert(alertC, 'success', id ? 'Integrante actualizado' : 'Integrante creado');
       closeModal('modal');
-      await reload();
+
     });
 
-    await reload();
+    await cargarKPIs();
+await reload();;
   </script>
 </body>
 </html>

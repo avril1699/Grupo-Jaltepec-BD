@@ -4,17 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Inicio — Grupo Jaltepec</title>
-  <link rel="stylesheet" href="/css/styles.css" />
-</head>
+ <link rel="stylesheet" href="/css/styles.css" />
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <body>
   <div class="container" id="main" style="display: none;">
     <div class="page-header"><h1>Resumen general</h1></div>
     <div class="kpi-grid" id="kpis"></div>
     <div class="dashboard-grid" id="stats"></div>
+    
     <div class="card">
       <h2>📅Próximas presentaciones</h2>
-      
+  
       <div class="table-wrap">
         <table>
           <thead><tr><th>Fecha</th><th>Lugar</th><th>Cuadros</th></tr></thead>
@@ -22,7 +24,12 @@
         </table>
       </div>
     </div>
+<div class="card">
+  <h2>📅 Calendario General</h2>
 
+  <div id="calendar"></div>
+
+</div>
 <div class="card">
   <h2>👥 Control de asistencia</h2>
 <div id="asistencia-form-container"></div>
@@ -46,7 +53,9 @@
   id="mis-observaciones-card"
   style="display:none;"
 >
-  <h2>💃Mis observaciones</h2>
+
+  <h2>💃
+Mis observaciones</h2>
 
   <table id="tabla-observaciones">
     <thead>
@@ -59,12 +68,6 @@
 <tbody id="mis-observaciones"></tbody>
   </table>
 </div>
-<div class="card">
-  <h2>📦 Inventario disponible</h2>
-  <canvas id="chartInventario"></canvas>
-</div>
-
-
     <div class="card">
       <h2>📝 Última actividad</h2>
       <div class="table-wrap">
@@ -188,6 +191,7 @@ DO UPDATE SET
   observacion = EXCLUDED.observacion
 `);
 
+
       if (!res.error) {
         alert(
           'Asistencia registrada'
@@ -200,27 +204,6 @@ DO UPDATE SET
     }
   }
 );
-    const queries = [
-  { label: 'Total Integrantes', sql: 'SELECT COUNT(*) AS n FROM integrante' },
-  { label: 'Total Bailes', sql: 'SELECT COUNT(*) AS n FROM baile' },
-  { label: 'Total Presentaciones', sql: 'SELECT COUNT(*) AS n FROM presentacion' },
-  { label: 'Total Cuadros', sql: 'SELECT COUNT(*) AS n FROM cuadro' },
-  {
-    label: 'Inventario Total',
-    sql: 'SELECT COALESCE(SUM(cantidad_total),0) AS n FROM inventario'
-  }
-];
-    for (const q of queries) {
-      const { data } = await execSQL(q.sql);
-      const value = data && data[0] ? data[0].n : '?';
-      stats.insertAdjacentHTML('beforeend', `
-        <div class="stat-card">
-          <div class="label">${q.label}</div>
-          <div class="value">${value}</div>
-        </div>
-      `);
-    }
-
     const proximas = await execSQL(`
       SELECT p.id, p.fecha, p.lugar, COUNT(c.id) AS num_cuadros
         FROM presentacion p
@@ -420,30 +403,6 @@ ${p}%
 }
 try {
 
-const part = await execSQL(`
-SELECT
-i.nombre,
-COUNT(*) AS total
-FROM participa_en p
-JOIN integrante i
-ON i.id = p.id_integrante
-GROUP BY i.nombre
-ORDER BY total DESC
-LIMIT 10
-`);
-
-new Chart(
-document.getElementById('chartParticipaciones'),
-{
-  type:'bar',
-  data:{
-    labels: part.data.map(x => x.nombre),
-    datasets:[{
-      label:'Participaciones',
-      data: part.data.map(x => x.total)
-    }]
-  }
-});
 
 } catch(e) {
   console.log(e);
@@ -468,32 +427,52 @@ kpis.insertAdjacentHTML(
 </div>
 `
 );
-try {
-
-const inv = await execSQL(`
+// ============================
+// CALENDARIO MENSUAL
+// ============================
+const eventosCalendario =
+await execSQL(`
 SELECT
-nombre,
-cantidad_total
-FROM inventario
-ORDER BY cantidad_total DESC
-LIMIT 10
+  id,
+  fecha,
+  lugar
+FROM presentacion
+ORDER BY fecha
 `);
 
-new Chart(
-document.getElementById('chartInventario'),
-{
-  type:'pie',
-  data:{
-    labels:inv.data.map(x => x.nombre),
-    datasets:[{
-      data:inv.data.map(x => x.cantidad_total)
-    }]
-  }
-});
+const calendarEl =
+document.getElementById('calendar');
 
-} catch(e) {
-  console.log(e);
+console.log('FullCalendar:', window.FullCalendar);
+console.log('Calendar div:', calendarEl);
+console.log('Eventos:', eventosCalendario.data);
+
+if(calendarEl && window.FullCalendar){
+
+  const calendar =
+  new window.FullCalendar.Calendar(
+    calendarEl,
+    {
+      initialView:'dayGridMonth',
+      locale:'es',
+      height:700,
+      events:(eventosCalendario.data || []).map(e => ({
+        id:e.id,
+        title:'🎭 ' + e.lugar,
+        start:e.fecha,
+        url:'/pages/eventos.html?id=' + e.id
+      }))
+    }
+  );
+
+  calendar.render();
+
+} else {
+  calendarEl.innerHTML =
+    '<p style="color:red;">No cargó FullCalendar</p>';
 }
+
+
   </script>
 </body>
 </html>

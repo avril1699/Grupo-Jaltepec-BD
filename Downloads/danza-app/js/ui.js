@@ -4,14 +4,11 @@ export function renderNavbar(active) {
   const session = getSession();
   if (!session) return;
   const links = [
-    { href: '/pages/dashboard.html',       label: 'Inicio',          key: 'dashboard' },
-    { href: '/pages/integrantes.html',     label: 'Integrantes',     key: 'integrantes' },
-    { href: '/pages/bailes.html',          label: 'Bailes',          key: 'bailes' },
-    { href: '/pages/participaciones.html', label: 'Participaciones', key: 'participaciones' },
-    { href: '/pages/presentaciones.html',  label: 'Presentaciones',  key: 'presentaciones' },
-    { href: '/pages/cuadros.html',         label: 'Cuadros',         key: 'cuadros' },
-    { href: '/pages/observaciones.html',   label: 'Observaciones',   key: 'observaciones' },
-    { href: '/pages/inventario.html',      label: 'Inventario',      key: 'inventario' }
+    { href: '/pages/dashboard.html',       label: '🏠Inicio',          key: 'dashboard' },
+    { href: '/pages/integrantes.html',     label: '💃Integrantes',     key: 'integrantes' },
+    { href:'/pages/eventos.html',          label:'🎪 Eventos',         key:'eventos'},
+    { href: '/pages/inventario.html',      label: '📦Inventario',      key: 'inventario' },
+    { href: '/pages/repertorio.html',      label:'🎭 Repertorio',      key:'repertorio' }
   ];
   const html = `
   

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+<meta charset="UTF-8">
+<title>Repertorio</title>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<div class="container" id="main">
+<div class="page-header">
+  <h1>🎭 Repertorio General</h1>
+  <div class="actions">
+    <button
+      id="nuevoBaile"
+      style="display:none;">
+      ➕ Agregar baile
+    </button>
+  </div>
+</div>
+
+<div class="repertorio-layout">
+<div
+class="baile-list"
+id="listaBailes">
+</div>
+
+<div
+class="baile-detalle"
+id="detalleBaile">
+<h2>
+Selecciona un baile
+</h2>
+</div>
+</div>
+</div>
+
+<script type="module">
+import { execSQL }
+from '/js/config.js';
+import { renderNavbar }
+from '/js/ui.js';
+import { getSession } from '/js/auth.js';
+renderNavbar('repertorio');
+
+const session = getSession();
+const esAdmin = session?.user?.rol === 'admin';
+if(esAdmin){
+  document
+    .getElementById('nuevoBaile')
+    .style.display = 'inline-block';
+}
+let baileActual = null;
+const lista =
+document.getElementById(
+'listaBailes'
+);
+const detalle =
+document.getElementById(
+'detalleBaile'
+);
+
+const { data: bailes } =
+await execSQL(`
+SELECT
+b.*,
+COUNT(c.id) cuadros
+FROM baile b
+LEFT JOIN cuadro c
+ON c.id_baile=b.id
+GROUP BY b.id
+ORDER BY b.nombre
+`);
+bailes.forEach(b=>{
+lista.insertAdjacentHTML(
+'beforeend',
+`
+<div
+class="baile-card"
+data-id="${b.id}">
+<h3>${b.nombre}</h3>
+<p>
+⏱ ${b.duracion || '00:00'}
+</p>
+<p>
+🎬 ${b.cuadros} cuadros
+</p>
+</div>
+`
+);
+});
+if (bailes.length > 0) {
+  document
+  .querySelector(
+    '.baile-card'
+  )
+  .classList.add(
+    'active'
+  );
+  await mostrarBaile(
+    bailes[0].id
+  );
+}
+lista.addEventListener(
+'click',
+async e=>{
+const card =
+e.target.closest(
+'.baile-card'
+);
+if(!card) return;
+document
+.querySelectorAll(
+'.baile-card'
+)
+.forEach(x=>
+x.classList.remove(
+'active'
+)
+);
+card.classList.add(
+'active'
+);
+const id =
+card.dataset.id;
+mostrarBaile(id);
+}
+);
+async function mostrarBaile(id){
+    baileActual = id;
+const baile =
+await execSQL(`
+SELECT *
+FROM baile
+WHERE id=${id}
+`);
+console.log(bailes);
+const b =
+baile.data[0];
+const cuadros =
+await execSQL(`
+SELECT *
+FROM cuadro
+WHERE id_baile=${id}
+ORDER BY orden
+`);
+let segundos = 0;
+cuadros.data.forEach(c=>{
+if(c.duracion){
+const partes =
+String(c.duracion)
+.split(':');
+segundos +=
+(+partes[0]*3600)+
+(+partes[1]*60)+
+(+partes[2]);
+}
+});
+const meta =
+600;
+const porcentaje =
+Math.min(
+(segundos/meta)*100,
+100
+);
+detalle.innerHTML =
+`
+<h2>
+${b.nombre}
+</h2>
+<div class="progreso">
+<div
+class="progreso-bar"
+style="
+width:${porcentaje}%
+">
+</div>
+</div>
+
+<p>
+${Math.floor(segundos/60)}
+ minutos
+</p>
+
+<h3>
+📖 Historia
+</h3>
+<p>
+${b.informacion_baile||''}
+</p>
+<h3>
+⭐ Solistas
+</h3>
+
+${
+esAdmin
+? `
+<button
+id="editarSolistas"
+class="btn-secondary">
+✏️ Editar solistas
+</button>
+`
+: ''
+}
+
+<div class="solistas">
+${
+(b.solistas||'')
+.split(',')
+.map(s=>`
+<div
+class="solista-avatar"
+title="${s.trim()}">
+${s.trim()[0] || '?'}
+</div>
+`)
+.join('')
+}
+</div>
+
+<h3>
+🎬 Secuencia
+</h3>
+<div
+class="timeline"
+id="timeline">
+</div>
+
+${
+esAdmin
+? `
+<button id="nuevoCuadro">
+➕ Añadir cuadro
+</button>
+`
+: ''
+}
+`;
+const timeline =
+document.getElementById(
+'timeline'
+);
+cuadros.data.forEach(c=>{
+timeline.insertAdjacentHTML(
+'beforeend',
+`
+<div
+class="cuadro-block"
+draggable="true"
+data-id="${c.id}"
+style="
+background:
+${c.color || '#c0392b'}
+">
+${c.nombre}
+<div>
+👫 ${c.numero_parejas}
+</div>
+<div
+class="parejas-icons">
+${
+Array(
+Math.max(
+1,
+c.numero_parejas
+)
+)
+.fill('💃')
+.join('')
+}
+</div>
+</div>
+`
+);
+
+});
+activarDrag();
+}
+function activarDrag(){
+const items =
+document.querySelectorAll(
+'.cuadro-block'
+);
+let drag;
+items.forEach(item=>{
+item.addEventListener(
+'dragstart',
+()=>{
+drag=item;
+}
+);
+item.addEventListener(
+'dragover',
+e=>e.preventDefault()
+);
+item.addEventListener(
+'drop',
+async ()=>{
+const parent =
+item.parentNode;
+parent.insertBefore(
+drag,
+item
+);
+const ordenados =
+[
+...parent.children
+];
+for(
+let i=0;
+i<ordenados.length;
+i++
+){
+await execSQL(`
+UPDATE cuadro
+SET orden=${i}
+WHERE id=
+${ordenados[i].dataset.id}
+`);
+}
+});
+});
+}
+document.addEventListener('click', async e => {
+if(e.target.id === 'editarSolistas'){
+
+  if(!esAdmin){
+    alert('Solo el administrador puede editar solistas');
+    return;
+  }
+
+  if(!baileActual){
+    alert('Selecciona un baile');
+    return;
+  }
+
+  const actuales =
+    [...document.querySelectorAll('.solista-avatar')]
+    .map(x => x.title || x.textContent.trim())
+    .filter(x => x && x !== '?')
+    .join(', ');
+
+  const nuevos =
+    prompt(
+      'Escribe los solistas separados por coma',
+      actuales
+    );
+
+  if(nuevos === null) return;
+
+  await execSQL(`
+    UPDATE baile
+    SET solistas='${nuevos.replace(/'/g,"''")}'
+    WHERE id=${baileActual}
+  `);
+
+  await mostrarBaile(baileActual);
+}
+  if(e.target.id === 'nuevoCuadro'){
+
+    if(!esAdmin){
+      alert('Solo el administrador puede agregar cuadros');
+      return;
+    }
+
+    if(!baileActual){
+      alert('Selecciona un baile');
+      return;
+    }
+
+    const nombre =
+      prompt('Nombre del cuadro');
+
+    if(!nombre) return;
+
+    const parejas =
+      prompt('Número de parejas', '0');
+
+    const duracion =
+      prompt('Duración del cuadro en formato HH:MM:SS', '00:02:00');
+
+    const color =
+      prompt('Color del bloque', '#c0392b');
+
+    await execSQL(`
+      INSERT INTO cuadro(
+        id_baile,
+        nombre,
+        numero_parejas,
+        duracion,
+        color,
+        orden
+      )
+      VALUES(
+        ${baileActual},
+        '${nombre.replace(/'/g,"''")}',
+        ${parseInt(parejas) || 0},
+        '${duracion || '00:00:00'}',
+        '${color || '#c0392b'}',
+        999
+      )
+    `);
+
+    await mostrarBaile(baileActual);
+  }
+
+  if(e.target.id === 'nuevoBaile'){
+
+    if(!esAdmin){
+      alert('Solo el administrador puede agregar bailes');
+      return;
+    }
+
+    const nombre =
+      prompt('Nombre del baile');
+
+    if(!nombre) return;
+
+    const duracion =
+      prompt('Duración aproximada HH:MM:SS', '00:10:00');
+
+    const solistas =
+      prompt('Solistas separados por coma', '');
+
+    const info =
+      prompt('Información histórica/cultural', '');
+
+    await execSQL(`
+      INSERT INTO baile(
+        nombre,
+        duracion,
+        solistas,
+        informacion_baile
+      )
+      VALUES(
+        '${nombre.replace(/'/g,"''")}',
+        '${duracion || '00:00:00'}',
+        '${solistas.replace(/'/g,"''")}',
+        '${info.replace(/'/g,"''")}'
+      )
+    `);
+
+    location.reload();
+  }
+
+});
+</script>
+</body>
+</html>
