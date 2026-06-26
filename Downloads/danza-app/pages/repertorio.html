@@ -78,7 +78,16 @@ lista.insertAdjacentHTML(
 <div
 class="baile-card"
 data-id="${b.id}">
-<h3>${b.nombre}</h3>
+<h2>
+${b.nombre}
+</h2>
+
+${
+esAdmin
+? `
+`
+: ''
+}
 <p>
 ⏱ ${b.duracion || '00:00'}
 </p>
@@ -165,9 +174,35 @@ Math.min(
 );
 detalle.innerHTML =
 `
-<h2>
-${b.nombre}
-</h2>
+<div class="titulo-baile">
+
+  <h2>${b.nombre}</h2>
+
+  ${
+    esAdmin
+    ? `
+      <button
+        id="accionesBaile"
+        class="acciones-btn">
+        ⋮
+      </button>
+
+      <div
+        id="menuBaile"
+        class="menu-baile">
+
+        <button
+          id="eliminarBaile"
+          class="danger">
+          🗑 Eliminar baile
+        </button>
+
+      </div>
+    `
+    : ''
+  }
+
+</div>
 <div class="progreso">
 <div
 class="progreso-bar"
@@ -230,9 +265,9 @@ id="timeline">
 ${
 esAdmin
 ? `
-<button id="nuevoCuadro">
-➕ Añadir cuadro
-</button>
+<div id="nuevoCuadro" class="add-cuadro-card">
+  + Añadir cuadro
+</div>
 `
 : ''
 }
@@ -251,14 +286,37 @@ draggable="true"
 data-id="${c.id}"
 style="
 background:
-${c.color || '#c0392b'}
+${(c.color && c.color !== 'null' && c.color !== '')
+    ? c.color
+    : '#c0392b'}
 ">
-${c.nombre}
-<div>
-👫 ${c.numero_parejas}
+<div class="cuadro-header">
+  <strong>${c.nombre}</strong>
+
+  ${
+    esAdmin
+    ? `
+    <button
+      class="cuadro-menu-btn"
+      data-delete-cuadro="${c.id}">
+      ×
+    </button>
+    `
+    : ''
+  }
 </div>
-<div
-class="parejas-icons">
+
+<div>
+  👫 ${c.numero_parejas}
+</div>
+
+${
+esAdmin
+? `
+`
+: ''
+}
+<class="parejas-icons">
 ${
 Array(
 Math.max(
@@ -323,6 +381,93 @@ ${ordenados[i].dataset.id}
 });
 }
 document.addEventListener('click', async e => {
+  if(e.target.id === 'accionesBaile'){
+
+    document
+        .getElementById('menuBaile')
+        .classList
+        .toggle('show');
+
+    return;
+}
+
+if(
+    !e.target.closest('.titulo-baile')
+){
+
+    document
+        .getElementById('menuBaile')
+        ?.classList.remove('show');
+
+}
+  const deleteCuadro =
+  e.target.dataset.deleteCuadro;
+
+if(deleteCuadro){
+
+  if(!confirm('¿Eliminar este cuadro?')){
+    return;
+  }
+
+  await execSQL(`
+    DELETE FROM cuadro
+    WHERE id=${deleteCuadro}
+  `);
+
+  await mostrarBaile(baileActual);
+  return;
+}
+  if(e.target.id === 'eliminarBaile'){
+
+  if(!esAdmin){
+    alert('Solo el administrador puede eliminar bailes');
+    return;
+  }
+
+  if(!baileActual){
+    alert('Selecciona un baile');
+    return;
+  }
+
+  if(!confirm('¿Eliminar este baile y todos sus cuadros?')){
+    return;
+  }
+
+  await execSQL(`
+    DELETE FROM cuadro
+    WHERE id_baile=${baileActual};
+
+    DELETE FROM baile
+    WHERE id=${baileActual};
+  `);
+
+  alert('Baile eliminado');
+  location.reload();
+  return;
+}
+
+if(e.target.classList.contains('eliminar-cuadro')){
+
+  if(!esAdmin){
+    alert('Solo el administrador puede eliminar cuadros');
+    return;
+  }
+
+  const idCuadro =
+    e.target.dataset.id;
+
+  if(!confirm('¿Eliminar este cuadro?')){
+    return;
+  }
+
+  await execSQL(`
+    DELETE FROM cuadro
+    WHERE id=${idCuadro};
+  `);
+
+  await mostrarBaile(baileActual);
+  return;
+}
 if(e.target.id === 'editarSolistas'){
 
   if(!esAdmin){
@@ -379,10 +524,21 @@ if(e.target.id === 'editarSolistas'){
 
     const duracion =
       prompt('Duración del cuadro en formato HH:MM:SS', '00:02:00');
+    const colores = [
+  '#c0392b', // rojo
+  '#8e44ad', // morado
+  '#2980b9', // azul
+  '#16a085', // turquesa
+  '#27ae60', // verde
+  '#d35400', // naranja
+  '#f39c12', // amarillo
+  '#2c3e50', // azul oscuro
+  '#7f8c8d', // gris
+  '#e67e22', // ámbar
+];
 
-    const color =
-      prompt('Color del bloque', '#c0392b');
-
+const color =
+  colores[Math.floor(Math.random() * colores.length)];
     await execSQL(`
       INSERT INTO cuadro(
         id_baile,
@@ -397,7 +553,7 @@ if(e.target.id === 'editarSolistas'){
         '${nombre.replace(/'/g,"''")}',
         ${parseInt(parejas) || 0},
         '${duracion || '00:00:00'}',
-        '${color || '#c0392b'}',
+         '${color}',
         999
       )
     `);
