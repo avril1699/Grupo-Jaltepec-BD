@@ -138,10 +138,9 @@
       const nombreArchivo =
         Date.now() +
         '_' +
-        file.name.replaceAll(
-          ' ',
-          '_'
-        );
+        file.name
+  .toLowerCase()
+  .replace(/[^a-z0-9.]/g, '_');
 
       const { error } =
         await supabase.storage
@@ -157,12 +156,13 @@
           );
 
       if (error) {
-        alert(
-          'Error al subir la foto'
-        );
-        console.error(error);
-        return;
-      }
+  console.error('Error Storage:', error);
+  alert(
+    'Error al subir la foto: ' +
+    (error.message || JSON.stringify(error))
+  );
+  return;
+}
 
       const { data } =
         supabase.storage
@@ -299,7 +299,7 @@ return `
   data-id="${r.id}"
 >
   <img
-    src="${r.foto_url || '/Imagen/avatar.png'}"
+    src="${r.foto_url && r.foto_url !== 'null' ? r.foto_url : '/Imagen/avatar.png'}"
     alt="${r.nombre}"
   >
 
@@ -458,7 +458,9 @@ document.getElementById(
       const obs = document.getElementById('f-obs').value.trim() || null;
       const telefono = document.getElementById('f-telefono').value.trim() || null;
       const correo = document.getElementById('f-correo').value.trim() || null;
-      const foto = fotoUrl;
+      const foto =
+  fotoUrl || null;
+
       const activo =
   document.getElementById('f-activo').value === 'true';
 
@@ -491,7 +493,7 @@ const estatura =
       talla_calzado=${esc(tallaCalzado)},
       estatura=${esc(estatura)}
     WHERE id=${esc(id)}
-    RETURNING *
+RETURNING *
   `
   : `
     UPDATE integrante SET
@@ -540,7 +542,7 @@ const estatura =
         { nombre, fecha_ingresso: ing }, 'integrante', data && data[0] ? data[0].id : null);
       showAlert(alertC, 'success', id ? 'Integrante actualizado' : 'Integrante creado');
       closeModal('modal');
-
+await reload();
     });
 
     await cargarKPIs();
