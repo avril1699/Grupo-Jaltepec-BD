@@ -144,9 +144,7 @@
 
       const { error } =
         await supabase.storage
-          .from(
-            'fotos-integrantes'
-          )
+          .from( 'fotos-integrantes' )
           .upload(
             nombreArchivo,
             file,
@@ -164,17 +162,14 @@
   return;
 }
 
-      const { data } =
-        supabase.storage
-          .from(
-            'fotos-integrantes'
-          )
-          .getPublicUrl(
-            nombreArchivo
-          );
+    const { data } =
+  supabase.storage
+    .from('fotos-integrantes')
+    .getPublicUrl(nombreArchivo);
 
-      fotoUrl =
-        data.publicUrl;
+fotoUrl = data.publicUrl;
+
+console.log('URL pública generada:', fotoUrl);
 
       console.log(
         'Foto subida:',
@@ -273,7 +268,7 @@ function calcularAntiguedad(fecha){
 
     async function reload() {
       const rows = await loadRows(
-        'SELECT * FROM integrante ORDER BY id ASC', tbody,
+        'SELECT * FROM integrante ORDER BY foto_url NULLS LAST, id ASC' , tbody,
         r => {
 
 const antiguedad = calcularAntiguedad(
@@ -337,7 +332,7 @@ function mostrarPerfil(id){
   ).innerHTML = `
     <div class="perfil-header">
       <img
-        src="${r.foto_url || '/Imagen/avatar.png'}"
+       src="${r.foto_url && r.foto_url !== 'null' ? r.foto_url : '/Imagen/avatar.png'}"
         alt="${r.nombre}"
       >
 
@@ -364,18 +359,31 @@ function mostrarPerfil(id){
     <h3>🩺 Observaciones médicas</h3>
     <p>${r.observaciones_medicas || 'Ninguna'}</p>
 
-    ${
-  puedeEditar(r)
-  ? `
-  <div class="actions">
-    <button class="btn-secondary" data-edit="${r.id}">
-      ✏️ Editar perfil
+   ${
+puedeEditar(r)
+?
+`
+<div class="actions">
+  <button class="btn-secondary" data-edit="${r.id}">
+    ✏️ Editar perfil
+  </button>
+
+  ${
+    esAdmin
+    ? `
+    <button
+      class="btn-danger"
+      data-delete="${r.id}">
+      🗑 Eliminar integrante
     </button>
-  </div>
-  `
-  : ''
+    `
+    : ''
+  }
+</div>
+`
+: ''
 }
-  `;
+`;
 }
     document.getElementById('new-btn').addEventListener('click', () => {
       document.getElementById('modal-title').textContent = 'Nuevo integrante';
@@ -399,7 +407,33 @@ document.getElementById(
   }
 
   const editId = e.target.dataset.edit;
+const deleteId = e.target.dataset.delete;
 
+if(deleteId){
+  if(!esAdmin){
+    alert('Solo el administrador puede eliminar integrantes');
+    return;
+  }
+
+  if(!confirm('¿Eliminar este integrante?')){
+    return;
+  }
+
+  await execSQL(`
+    DELETE FROM asistencia
+    WHERE id_integrante=${deleteId};
+
+    DELETE FROM participa_en
+    WHERE id_integrante=${deleteId};
+
+    DELETE FROM integrante
+    WHERE id=${deleteId};
+  `);
+
+  await cargarKPIs();
+  await reload();
+  return;
+}
   if(editId){
     const r = window._rows.find(x => x.id == editId);
 
@@ -462,7 +496,10 @@ fotoUrl =
       const telefono = document.getElementById('f-telefono').value.trim() || null;
       const correo = document.getElementById('f-correo').value.trim() || null;
       const foto =
-  fotoUrl || null;
+  fotoUrl &&
+  fotoUrl !== 'null'
+    ? fotoUrl
+    : null;
 
       const activo =
   document.getElementById('f-activo').value === 'true';
@@ -548,8 +585,8 @@ RETURNING *
 await reload();
     });
 
-    await cargarKPIs();
-await reload();;
-  </script>
+ await cargarKPIs();
+await reload();
+</script>
 </body>
 </html>
