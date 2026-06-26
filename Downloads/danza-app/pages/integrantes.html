@@ -424,8 +424,11 @@ document.getElementById(
     document.getElementById('f-talla-calzado').value = r.talla_calzado || '';
     document.getElementById('f-estatura').value = r.estatura || '';
 
-    fotoUrl = r.foto_url || null;
-
+fotoUrl =
+  r.foto_url &&
+  r.foto_url !== 'null'
+    ? r.foto_url
+    : null;
     const preview = document.getElementById('preview-foto');
 
     if(fotoUrl){
